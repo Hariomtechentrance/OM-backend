@@ -1,0 +1,379 @@
+/* Hero Section Styles */
+.hero {
+  position: relative;
+  height: calc(100vh - 70px);
+  min-height: 530px;
+  overflow: hidden;
+  background: #000;
+  background-image: linear-gradient(135deg, #1a1a1a 0%, #2c3e50 100%);
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  margin-top: 0; /* Remove margin to eliminate gap */
+  padding-top: 70px; /* Add padding for header space */
+  margin-bottom: 0; /* Remove bottom margin for seamless transition */
+}
+
+.hero-slides {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden; /* Hide overflow for sliding effect */
+}
+
+/* Sliding container */
+.hero-slides-container {
+  display: flex;
+  height: 100%;
+  animation: continuousScroll 20s linear infinite;
+}
+
+/* Continuous scrolling animation */
+@keyframes continuousScroll {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-33.33%); /* Move by one slide width for continuous effect */
+  }
+}
+
+/* Desktop Layout - Show 3 photos at once */
+.hero-slides.desktop {
+  display: block; /* Override flex for sliding */
+}
+
+.hero-slide.desktop-slide {
+  position: relative;
+  width: 33.33vw; /* 1/3 of viewport width to show 3 at once */
+  height: 100%;
+  flex-shrink: 0; /* Prevent shrinking */
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  border-radius: 0; /* Remove border radius for seamless sliding */
+  overflow: hidden;
+  box-shadow: none; /* Remove shadow for seamless sliding */
+  transition: transform 0.3s ease;
+}
+
+.hero-slide.desktop-slide:hover {
+  transform: scale(1.02); /* Subtle hover effect */
+}
+
+/* Mobile Layout - Full screen continuous scrolling */
+.hero-slides.mobile {
+  display: block; /* Override flex for sliding */
+}
+
+.hero-slides.mobile .hero-slides-container {
+  animation: continuousScrollMobile 4s linear infinite; /* 5x faster than desktop (20s / 5 = 4s) */
+}
+
+/* Mobile continuous scrolling animation */
+@keyframes continuousScrollMobile {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-33.33%); /* Move by one slide width for continuous effect */
+  }
+}
+
+.hero-slide.mobile-slide {
+  position: relative;
+  width: 100vw; /* Full viewport width for mobile */
+  height: calc(100vh - 70px); /* Account for header */
+  flex-shrink: 0; /* Prevent shrinking */
+  background-size: cover; /* Cover entire screen */
+  background-position: center;
+  background-repeat: no-repeat;
+  background-color: #000;
+}
+
+/* Show content on mobile properly */
+.hero-slide.mobile-slide .hero-content {
+  display: flex; /* Show text content on mobile */
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  padding: 2rem;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 2;
+}
+
+.hero-slide::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.4);
+  z-index: 1;
+}
+
+.hero-content {
+  position: absolute;
+  z-index: 2;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  padding: 2rem;
+  color: white;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 12px;
+  max-width: 80%;
+}
+
+.hero-logo {
+  margin-bottom: 1rem;
+}
+
+.hero-logo-img {
+  max-height: 60px;
+  width: auto;
+  filter: brightness(0) invert(1);
+  transition: all 0.3s ease;
+}
+
+.hero-logo-img:hover {
+  transform: scale(1.05);
+  filter: brightness(0) invert(1) drop-shadow(0 0 10px rgba(192, 147, 69, 0.5));
+}
+
+/* Desktop content styling for 3-photo layout */
+.hero-slide.desktop-slide .hero-content {
+  padding: 1rem;
+  max-width: 90%;
+  margin: 0 auto;
+}
+
+.hero-slide.desktop-slide .hero-title {
+  font-size: 1.2rem;
+  font-weight: 700;
+  margin-bottom: 0.8rem;
+  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.9);
+  line-height: 1.2;
+}
+
+.hero-slide.desktop-slide .hero-subtitle {
+  font-size: 0.8rem;
+  margin-bottom: 1.5rem;
+  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.9);
+  line-height: 1.4;
+}
+
+.hero-slide.desktop-slide .hero-cta {
+  padding: 0.5rem 1.5rem;
+  font-size: 0.8rem;
+  background: var(--gold);
+  color: white;
+  border: none;
+  border-radius: 20px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  font-weight: 600;
+  margin-top: 0.5rem;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+}
+
+/* Mobile content styling for sliding */
+.hero-slide.mobile-slide .hero-content {
+  padding: 2rem;
+  max-width: 90%;
+  margin: 0 auto;
+}
+
+.hero-slide.mobile-slide .hero-title {
+  font-size: 2rem;
+  font-weight: 700;
+  margin-bottom: 1rem;
+  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
+}
+
+.hero-slide.mobile-slide .hero-subtitle {
+  font-size: 1rem;
+  margin-bottom: 1.5rem;
+  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
+}
+
+.hero-slide.mobile-slide .hero-cta {
+  padding: 0.6rem 1.5rem;
+  font-size: 0.9rem;
+  background: var(--gold);
+  color: white;
+  border: none;
+  border-radius: 25px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  font-weight: 600;
+}
+
+/* Navigation Arrows */
+
+.hero-cta:hover {
+  background: var(--white);
+  transform: translateY(-2px);
+  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.3);
+}
+
+.hero-cta::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+  transition: left 0.5s;
+}
+
+.hero-cta:hover::after {
+  left: 100%;
+}
+
+/* Navigation Arrows */
+.hero-nav {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  background: rgba(255, 255, 255, 0.2);
+  border: 2px solid var(--white);
+  color: var(--white);
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.2rem;
+  cursor: pointer;
+  z-index: 3;
+  transition: all 0.3s ease;
+}
+
+.hero-nav:hover {
+  background: var(--white);
+  color: var(--dark);
+  transform: translateY(-50%) scale(1.1);
+}
+
+.hero-nav.prev {
+  left: 2rem;
+}
+
+.hero-nav.next {
+  right: 2rem;
+}
+
+/* Slide Indicators */
+.hero-indicators {
+  position: absolute;
+  bottom: 2rem;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 0.5rem;
+  z-index: 3;
+}
+
+.indicator {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 2px solid var(--white);
+  background: transparent;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.indicator.active {
+  background: var(--white);
+  transform: scale(1.2);
+}
+
+/* Responsive Design */
+@media (max-width: 1024px) {
+  .hero {
+    height: calc(75vh - 70px);
+    min-height: 430px;
+    margin-top: 0; /* Remove margin to eliminate gap */
+    padding-top: 70px; /* Add padding for header space */
+    margin-bottom: 0; /* Remove bottom margin for seamless transition */
+  }
+  
+  .hero-slides {
+    height: 100%;
+  }
+  
+  .hero-title {
+    font-size: 3rem;
+  }
+  
+  .hero-subtitle {
+    font-size: 1.1rem;
+  }
+}
+
+@media (max-width: 768px) {
+  .hero {
+    height: calc(100vh - 70px); /* Account for header height */
+    min-height: 530px; /* Minimum height for mobile */
+    margin-top: 0; /* Remove margin to eliminate gap */
+    padding-top: 70px; /* Add padding for header space */
+    margin-bottom: 0; /* Remove bottom margin for seamless transition */
+  }
+  
+  .hero-slides {
+    height: 100%; /* Account for header padding */
+    overflow: hidden; /* Hide overflow for sliding effect */
+  }
+  
+  .hero-slide.mobile-slide {
+    height: 100%; /* Full height of container */
+  }
+  
+  .hero-nav {
+    display: none;
+  }
+  
+  .hero-indicators {
+    display: none; /* Hide indicators for continuous scroll */
+  }
+}
+
+@media (max-width: 480px) {
+  .hero {
+    height: calc(100vh - 70px); /* Account for header height */
+    min-height: 430px; /* Minimum height for small mobile */
+    margin-top: 0; /* Remove margin to eliminate gap */
+    padding-top: 70px; /* Add padding for header space */
+    margin-bottom: 0; /* Remove bottom margin for seamless transition */
+  }
+  
+  .hero-slides {
+    height: 100%; /* Account for header padding */
+    overflow: hidden; /* Hide overflow for sliding effect */
+  }
+  
+  .hero-slide.mobile-slide {
+    height: 100%; /* Full height of container */
+  }
+  
+  /* Hide all indicators and navigation on mobile */
+  .hero-indicators {
+    display: none;
+  }
+  
+  .hero-nav {
+    display: none;
+  }
+}

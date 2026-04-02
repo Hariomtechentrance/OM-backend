@@ -1,0 +1,2 @@
+"use strict";(self.webpackChunkblack_locust_frontend=self.webpackChunkblack_locust_frontend||[]).push([[296],{5296(e,s,t){t.r(s),t.d(s,{default:()=>u});t(9643);var c=t(2906),l=t(6507);const u=()=>(0,l.jsx)(c.default,{})}}]);
+//# sourceMappingURL=296.df7a2ac6.chunk.js.map

@@ -1,0 +1,193 @@
+.global-product-filters {
+  background: var(--bg-primary);
+  padding: 0;
+}
+
+.global-product-filters__header {
+  display: none; /* We'll handle header in sidebar */
+}
+
+.gpf-expanded-content {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.gpf-section {
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 24px;
+}
+
+.gpf-section:last-child {
+  border-bottom: none;
+}
+
+.gpf-section-title {
+  font-size: 14px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 16px;
+  color: var(--text-primary);
+  display: block;
+}
+
+/* Field Selects */
+.gpf-field select {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  background-color: white;
+  color: var(--text-primary);
+  font-size: 14px;
+  outline: none;
+  cursor: pointer;
+}
+
+.gpf-field select:focus {
+  border-color: var(--text-primary);
+}
+
+/* Checkbox Groups (Categories/Collections) */
+.gpf-checkbox-group {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.gpf-checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.gpf-checkbox-label:hover {
+  color: var(--text-primary);
+}
+
+.gpf-checkbox-label input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--text-primary);
+}
+
+/* Size Grid */
+.gpf-size-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+
+.gpf-size-btn {
+  padding: 8px 0;
+  border: 1px solid var(--border-color);
+  background: white;
+  color: var(--text-primary);
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: var(--transition);
+  text-align: center;
+}
+
+.gpf-size-btn:hover {
+  border-color: var(--text-primary);
+}
+
+.gpf-size-btn.active {
+  background: var(--text-primary);
+  color: white;
+  border-color: var(--text-primary);
+}
+
+/* Color Swatches */
+.gpf-color-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 12px;
+}
+
+.gpf-color-swatch {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 1px solid var(--border-color);
+  cursor: pointer;
+  position: relative;
+  transition: var(--transition);
+}
+
+.gpf-color-swatch:hover {
+  transform: scale(1.2);
+}
+
+.gpf-color-swatch.active:after {
+  content: '✓';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: white;
+  font-size: 12px;
+  text-shadow: 0 0 2px rgba(0,0,0,0.5);
+}
+
+/* Price Range */
+.gpf-price-inputs {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.gpf-price-inputs input {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  font-size: 13px;
+  outline: none;
+}
+
+.gpf-price-separator {
+  color: var(--text-secondary);
+}
+
+/* Actions */
+.gpf-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.gpf-btn-apply {
+  flex: 1;
+  background: var(--btn-cta);
+  color: white;
+  padding: 12px;
+  border: none;
+  border-radius: 4px;
+  font-weight: 600;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  cursor: pointer;
+}
+
+.gpf-btn-reset {
+  background: white;
+  color: var(--text-primary);
+  padding: 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  font-weight: 600;
+  font-size: 13px;
+  cursor: pointer;
+}

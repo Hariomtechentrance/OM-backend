@@ -1,0 +1,5 @@
+// Add this import to your App.js
+import SupabaseTest from './components/SupabaseTest';
+
+// Add this inside your App component, before the Routes
+<SupabaseTest />

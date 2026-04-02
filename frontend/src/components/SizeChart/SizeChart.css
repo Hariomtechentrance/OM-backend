@@ -1,0 +1,363 @@
+.size-chart-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.6);
+  z-index: 999;
+  opacity: 0;
+  visibility: hidden;
+  transition: all 0.3s ease;
+}
+
+.size-chart-overlay.active {
+  opacity: 1;
+  visibility: visible;
+}
+
+.size-chart-modal {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) scale(0.9);
+  width: 90%;
+  max-width: 800px;
+  max-height: 85vh;
+  background: white;
+  border-radius: 12px;
+  z-index: 1000;
+  opacity: 0;
+  visibility: hidden;
+  transition: all 0.3s ease;
+  overflow: hidden;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+}
+
+.size-chart-modal.active {
+  opacity: 1;
+  visibility: visible;
+  transform: translate(-50%, -50%) scale(1);
+}
+
+.size-chart-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 25px;
+  background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+  color: white;
+}
+
+.size-chart-header h3 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.close-btn {
+  background: rgba(255, 255, 255, 0.2);
+  border: none;
+  color: white;
+  font-size: 18px;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.close-btn:hover {
+  background: rgba(255, 255, 255, 0.3);
+  transform: scale(1.1);
+}
+
+.size-chart-tabs {
+  display: flex;
+  background: #f8f9fa;
+  border-bottom: 1px solid #e9ecef;
+}
+
+.tab-btn {
+  flex: 1;
+  padding: 15px 20px;
+  border: none;
+  background: transparent;
+  font-size: 14px;
+  font-weight: 600;
+  color: #6c757d;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border-bottom: 3px solid transparent;
+}
+
+.tab-btn:hover {
+  background: #e9ecef;
+  color: #495057;
+}
+
+.tab-btn.active {
+  color: #2c3e50;
+  background: white;
+  border-bottom-color: #2c3e50;
+}
+
+.size-chart-content {
+  padding: 30px;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.size-table-container {
+  overflow-x: auto;
+  margin-bottom: 20px;
+}
+
+.size-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: white;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.size-table th {
+  background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+  color: white;
+  padding: 15px 12px;
+  text-align: left;
+  font-weight: 600;
+  font-size: 14px;
+  white-space: nowrap;
+}
+
+.size-table td {
+  padding: 12px;
+  border-bottom: 1px solid #e9ecef;
+  font-size: 14px;
+  color: #495057;
+}
+
+.size-table tr:hover {
+  background: #f8f9fa;
+}
+
+.size-table tr:last-child td {
+  border-bottom: none;
+}
+
+.size-table td:first-child {
+  font-weight: 600;
+  color: #2c3e50;
+  background: rgba(102, 126, 234, 0.05);
+}
+
+.size-chart-footer {
+  padding: 25px 30px;
+  background: #f8f9fa;
+  border-top: 1px solid #e9ecef;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 30px;
+}
+
+.size-tips h4 {
+  margin: 0 0 15px 0;
+  color: #495057;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.size-tips ul {
+  margin: 0;
+  padding-left: 20px;
+  color: #6c757d;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.size-tips li {
+  margin-bottom: 8px;
+}
+
+.size-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  justify-content: center;
+}
+
+.how-to-measure-btn,
+.find-my-size-btn {
+  padding: 12px 20px;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.how-to-measure-btn {
+  background: #6c757d;
+  color: white;
+}
+
+.how-to-measure-btn:hover {
+  background: #5a6268;
+  transform: translateY(-1px);
+}
+
+.find-my-size-btn {
+  background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+  color: white;
+}
+
+.find-my-size-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .size-chart-modal {
+    width: 95%;
+    max-height: 90vh;
+  }
+
+  .size-chart-header {
+    padding: 15px 20px;
+  }
+
+  .size-chart-header h3 {
+    font-size: 18px;
+  }
+
+  .size-chart-tabs {
+    flex-direction: column;
+  }
+
+  .tab-btn {
+    border-bottom: 1px solid #e9ecef;
+    border-right: none;
+  }
+
+  .tab-btn.active {
+    border-bottom-color: #2c3e50;
+  }
+
+  .size-chart-content {
+    padding: 20px;
+  }
+
+  .size-chart-footer {
+    grid-template-columns: 1fr;
+    gap: 20px;
+    padding: 20px;
+  }
+
+  .size-table {
+    font-size: 12px;
+  }
+
+  .size-table th,
+  .size-table td {
+    padding: 10px 8px;
+    font-size: 12px;
+  }
+}
+
+@media (max-width: 480px) {
+  .size-chart-header h3 {
+    font-size: 16px;
+  }
+
+  .tab-btn {
+    padding: 12px 15px;
+    font-size: 13px;
+  }
+
+  .size-chart-content {
+    padding: 15px;
+  }
+
+  .size-table th,
+  .size-table td {
+    padding: 8px 6px;
+    font-size: 11px;
+  }
+
+  .size-chart-footer {
+    padding: 15px;
+  }
+
+  .size-tips h4 {
+    font-size: 14px;
+  }
+
+  .size-tips ul {
+    font-size: 13px;
+  }
+
+  .how-to-measure-btn,
+  .find-my-size-btn {
+    padding: 10px 15px;
+    font-size: 13px;
+  }
+}
+
+/* Animation for size chart button */
+.size-chart-trigger {
+  background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.size-chart-trigger:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+}
+
+.size-chart-trigger:active {
+  transform: translateY(0);
+}
+
+/* Scrollbar styling */
+.size-chart-content::-webkit-scrollbar {
+  width: 6px;
+}
+
+.size-chart-content::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 3px;
+}
+
+.size-chart-content::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+  border-radius: 3px;
+}
+
+.size-chart-content::-webkit-scrollbar-thumb:hover {
+  background: #a8a8a8;
+}

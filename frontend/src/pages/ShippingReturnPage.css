@@ -1,0 +1,283 @@
+/* Shipping & Return Page Styles */
+.shipping-return-page {
+  min-height: 100vh;
+  padding: 8rem 0 4rem 0;
+  background: #ffffff;
+  color: #333333;
+}
+
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 2rem;
+}
+
+.page-header {
+  text-align: center;
+  margin-bottom: 4rem;
+}
+
+.page-header h1 {
+  font-size: 3rem;
+  font-weight: 700;
+  color: #000000;
+  margin-bottom: 1rem;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+}
+
+.page-header p {
+  font-size: 1.1rem;
+  color: #666666;
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.content-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 4rem;
+  margin-bottom: 4rem;
+}
+
+.shipping-section,
+.returns-section {
+  background: #fdfdfd;
+  border: 1px solid #eeeeee;
+  border-radius: 0;
+  padding: 3rem;
+}
+
+.shipping-section h2,
+.returns-section h2 {
+  font-size: 2rem;
+  color: #000000;
+  margin-bottom: 2rem;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  border-bottom: 2px solid #000000;
+  padding-bottom: 0.5rem;
+}
+
+.shipping-types {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 2rem;
+  margin-bottom: 3rem;
+}
+
+.shipping-type {
+  background: #ffffff;
+  border: 1px solid #eeeeee;
+  border-radius: 0;
+  padding: 2rem;
+  transition: all 0.3s ease;
+}
+
+.shipping-type:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05);
+}
+
+.shipping-type h3 {
+  font-size: 1.3rem;
+  color: #000000;
+  margin-bottom: 1rem;
+  font-weight: 700;
+}
+
+.shipping-details p {
+  margin-bottom: 0.5rem;
+  color: #666666;
+  font-size: 0.9rem;
+}
+
+.shipping-details strong {
+  color: #000000;
+}
+
+.shipping-info,
+.return-policy,
+.return-process,
+.refund-info,
+.exchange-info {
+  margin-bottom: 3rem;
+}
+
+.shipping-info h3,
+.return-policy h3,
+.return-process h3,
+.refund-info h3,
+.exchange-info h3 {
+  font-size: 1.5rem;
+  color: #000000;
+  margin-bottom: 1.5rem;
+  font-weight: 700;
+}
+
+.return-conditions,
+.non-returnable {
+  margin-bottom: 2rem;
+}
+
+.return-conditions h4,
+.non-returnable h4 {
+  font-size: 1.1rem;
+  color: #000000;
+  margin-bottom: 1rem;
+  font-weight: 700;
+}
+
+.shipping-info ul,
+.return-conditions ul,
+.non-returnable ul,
+.refund-info ul,
+.exchange-info ul {
+  list-style: none;
+  padding: 0;
+}
+
+.shipping-info li,
+.return-conditions li,
+.non-returnable li,
+.refund-info li,
+.exchange-info li {
+  background: #f9f9f9;
+  margin-bottom: 0.5rem;
+  padding: 1rem;
+  border-left: 3px solid #000000;
+  color: #666666;
+  border-radius: 0;
+  font-size: 0.9rem;
+}
+
+.process-steps {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 2rem;
+}
+
+.step {
+  display: flex;
+  align-items: flex-start;
+  gap: 1.5rem;
+}
+
+.step-number {
+  width: 40px;
+  height: 40px;
+  background: #000000;
+  color: #ffffff;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 1.2rem;
+  flex-shrink: 0;
+}
+
+.step-content h4 {
+  font-size: 1.1rem;
+  color: #000000;
+  margin-bottom: 0.5rem;
+  font-weight: 700;
+}
+
+.step-content p {
+  color: #666666;
+  margin: 0;
+  font-size: 0.9rem;
+}
+
+.contact-support {
+  margin-top: 4rem;
+}
+
+.support-card {
+  background: #f9f9f9;
+  border: 1px solid #eeeeee;
+  border-radius: 0;
+  padding: 4rem;
+  text-align: center;
+}
+
+.support-card h2 {
+  font-size: 2rem;
+  color: #000000;
+  margin-bottom: 1rem;
+  font-weight: 700;
+}
+
+.support-card p {
+  font-size: 1.1rem;
+  color: #666666;
+  margin-bottom: 3rem;
+}
+
+.support-options {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 2rem;
+}
+
+.support-option {
+  background: #ffffff;
+  padding: 2.5rem;
+  border-radius: 0;
+  border: 1px solid #eeeeee;
+  transition: all 0.3s ease;
+}
+
+.support-option:hover {
+  transform: translateY(-5px);
+  border-color: #000000;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05);
+}
+
+.support-option h3 {
+  font-size: 1.2rem;
+  color: #000000;
+  margin-bottom: 0.75rem;
+  font-weight: 700;
+}
+
+.support-option p {
+  color: #333333;
+  margin-bottom: 0.25rem;
+  font-size: 1rem;
+}
+
+.support-option p:last-child {
+  color: #999999;
+  font-size: 0.85rem;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .shipping-return-page {
+    padding: 6rem 1rem 2rem 1rem;
+  }
+
+  .container {
+    padding: 0 1rem;
+  }
+
+  .page-header h1 {
+    font-size: 2.2rem;
+  }
+
+  .shipping-section,
+  .returns-section {
+    padding: 2rem;
+  }
+
+  .shipping-section h2,
+  .returns-section h2 {
+    font-size: 1.6rem;
+  }
+
+  .support-card {
+    padding: 2rem;
+  }
+}

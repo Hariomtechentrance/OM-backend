@@ -1,0 +1,126 @@
+.plp-page {
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  padding-bottom: 80px;
+}
+
+/* Category Chips */
+.category-chips-container {
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.chip {
+  padding: 10px 24px;
+  border: 1px solid #E5E7EB;
+  background: white;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  white-space: nowrap;
+  transition: all 0.3s ease;
+  color: #6B7280;
+}
+
+.chip:hover {
+  border-color: #000;
+  color: #000;
+}
+
+.chip.active {
+  background: #000;
+  color: #fff;
+  border-color: #000;
+}
+
+/* Filter Drawer */
+.filter-drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 1000;
+  visibility: hidden;
+  transition: all 0.4s cubic-bezier(0.19, 1, 0.22, 1);
+}
+
+.filter-drawer.open {
+  visibility: visible;
+}
+
+.filter-drawer-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0,0,0,0.4);
+  backdrop-filter: blur(4px);
+  opacity: 0;
+  transition: opacity 0.4s ease;
+}
+
+.filter-drawer.open .filter-drawer-overlay {
+  opacity: 1;
+}
+
+.filter-drawer-content {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 100%;
+  max-width: 400px;
+  height: 100%;
+  background: white;
+  transform: translateX(100%);
+  transition: transform 0.4s cubic-bezier(0.19, 1, 0.22, 1);
+  display: flex;
+  flex-direction: column;
+}
+
+.filter-drawer.open .filter-drawer-content {
+  transform: translateX(0);
+}
+
+.drawer-body {
+  flex: 1;
+  overflow-y: auto;
+}
+
+/* Layout */
+.plp-main-wide {
+  min-height: 600px;
+}
+
+.plp-loader {
+  display: flex;
+  justify-content: center;
+  padding: 100px 0;
+}
+
+.spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid #E5E7EB;
+  border-top-color: #000;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.plp-empty {
+  text-align: center;
+  padding: 100px 0;
+}

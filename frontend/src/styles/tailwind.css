@@ -1,0 +1,41 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Playfair+Display:wght@500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --bl-black: #000000;
+    --bl-white: #ffffff;
+    --bl-gold: #c19a6b;
+    --bl-text-primary: #111111;
+    --bl-text-secondary: #6b7280;
+    --bl-border: #e5e7eb;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+    background: var(--bl-black);
+    color: var(--bl-white);
+  }
+}
+
+@layer components {
+  .bl-container {
+    @apply mx-auto w-full max-w-[1280px] px-4 sm:px-6 lg:px-8;
+  }
+
+  .bl-section {
+    @apply py-12 md:py-16 lg:py-[80px];
+  }
+
+  .bl-link {
+    @apply text-white/80 hover:text-white transition-colors duration-300;
+  }
+}
+

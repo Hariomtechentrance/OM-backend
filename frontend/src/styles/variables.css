@@ -1,0 +1,21 @@
+:root {
+  --header-height: 80px;
+  --bg-primary: #FFFFFF;
+  --bg-surface: #FAFAFA;
+  --text-primary: #111111;
+  --text-secondary: #6B7280;
+  --accent-gold: #C19A6B;
+  --btn-cta: #000000;
+  --border-color: #E5E7EB;
+  
+  --font-heading: 'Playfair Display', serif;
+  --font-body: 'Inter', sans-serif;
+  
+  --section-padding-desktop: 80px;
+  --section-padding-mobile: 40px;
+  --grid-gap: 24px;
+  --border-radius: 8px;
+  
+  --transition: 0.3s ease;
+  --shadow-light: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+}

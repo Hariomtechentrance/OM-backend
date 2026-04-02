@@ -1,0 +1,56 @@
+BLACK LOCUST - GODADDY DEPLOYMENT INSTRUCTIONS
+============================================
+
+STEP 1: UPLOAD FILES
+------------------
+1. Log into GoDaddy cPanel
+2. Go to File Manager
+3. Navigate to public_html/
+4. Delete all existing files
+5. Upload all files from this folder
+
+STEP 2: CONFIGURE ENVIRONMENT
+------------------------------
+1. Edit the .env file with your actual values:
+   - your-domain.com → Replace with your actual domain
+   - YOUR_PASSWORD → Replace with MongoDB password
+   - your-secret-keys → Replace with generated secrets
+
+STEP 3: SET FILE PERMISSIONS
+------------------------------
+1. Select all files in File Manager
+2. Click "Change Permissions"
+3. Set directories to 755
+4. Set files to 644
+
+STEP 4: CONFIGURE DOMAIN
+-------------------------
+1. In GoDaddy DNS settings:
+   - A Record: @ → GoDaddy server IP
+   - CNAME: www → @
+   - TTL: 1 Hour
+
+STEP 5: SETUP SSL
+----------------
+1. Go to SSL Certificates in cPanel
+2. Install free SSL certificate
+3. Enable HTTPS redirect
+
+STEP 6: TEST WEBSITE
+-------------------
+1. Visit https://your-domain.com
+2. Check if frontend loads
+3. Test user registration
+4. Test product browsing
+
+TROUBLESHOOTING:
+-----------------
+- Blank page: Check .htaccess and file permissions
+- API errors: Verify .env configuration
+- Database errors: Check MongoDB connection string
+- Images not loading: Verify Cloudinary settings
+
+SUPPORT:
+--------
+- GoDaddy Support: 480-505-8877
+- MongoDB Atlas: https://docs.atlas.mongodb.com
