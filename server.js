@@ -5,11 +5,9 @@ import helmet from 'helmet';
 import compression from 'compression';
 import morgan from 'morgan';
 import rateLimit from 'express-rate-limit';
-import net from 'net';
-import { execSync } from 'child_process';
 import 'dotenv/config';
 
-// Import only essential routes that exist
+// Import routes
 import productRoutes from './routes/productRoutes.js';
 import userRoutes from './routes/userRoutes.js';
 import cartRoutes from './routes/cartRoutes.js';
@@ -21,197 +19,132 @@ import authRoutes from './routes/auth.js';
 
 const app = express();
 
-// CORS - MUST be first middleware
+// ─── CORS — MUST be very first middleware ─────────────────────────────────
+// Allows: localhost dev, any Render deployment, Vercel, custom domains
 const allowedOrigins = [
   "http://localhost:3000",
+  "http://localhost:3001",
   "http://localhost:5002",
+  // ✅ ADD YOUR EXACT FRONTEND URL HERE:
+  "https://om-frontend-rsti.onrender.com",
+  // Old frontend (keep for safety)
   "https://blacklocust-frontend.onrender.com",
+  // Custom domains
   "https://blacklocust.in",
-  "https://www.blacklocust.in"
+  "https://www.blacklocust.in",
 ];
 
 app.use(cors({
   origin: function (origin, callback) {
-    if (!origin || allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      console.log("❌ Blocked by CORS:", origin);
-      callback(new Error("Not allowed by CORS"));
-    }
+    // Allow requests with no origin (Postman, curl, mobile apps, SSR)
+    if (!origin) return callback(null, true);
+
+    // Allow any *.onrender.com subdomain automatically
+    if (origin.endsWith('.onrender.com')) return callback(null, true);
+
+    // Allow any *.vercel.app subdomain automatically
+    if (origin.endsWith('.vercel.app')) return callback(null, true);
+
+    // Allow explicitly listed origins
+    if (allowedOrigins.includes(origin)) return callback(null, true);
+
+    // Block everything else
+    console.log("❌ Blocked by CORS:", origin);
+    callback(new Error(`CORS: Origin ${origin} not allowed`));
   },
-  credentials: true
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
 }));
 
-// Remove problematic security middleware that might interfere
-// setupSecurity(app);
+// Handle preflight OPTIONS requests for ALL routes
+app.options('*', cors());
 
-// Additional middleware
-app.use(helmet({
-  crossOriginResourcePolicy: { policy: "cross-origin" }
-}));
+// ─── Security & Performance ───────────────────────────────────────────────────
+app.use(helmet({ crossOriginResourcePolicy: { policy: "cross-origin" } }));
 app.use(compression());
 app.use(morgan('dev'));
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
-
-// 🔥 Add trust proxy setting for PM2 and proxy environments
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.set('trust proxy', 1);
 
-// Rate limiting - increased for development
+// Rate limiting
 const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 1000 // increased from 100 to 1000 requests per windowMs
+  windowMs: 15 * 60 * 1000,
+  max: 1000,
+  standardHeaders: true,
+  legacyHeaders: false,
 });
 app.use('/api/', limiter);
 
+// ─── Database Connection ──────────────────────────────────────────────────────
 import createSuperAdmin from './utils/createSuperAdmin.js';
 import createAdmin from './seed/createAdmin.js';
 
-// Database connection
 const connectDB = async () => {
   try {
-    console.log("👉 MONGO_URI:", process.env.MONGO_URI); // DEBUG
-
+    console.log("👉 Connecting to MongoDB...");
     const conn = await mongoose.connect(process.env.MONGO_URI);
-
     console.log(`✅ MongoDB Connected: ${conn.connection.host}`);
-    
-    // Create super admin if none exists
     await createSuperAdmin();
-    
-    // Create admin if none exists
     await createAdmin();
   } catch (error) {
-    console.error("❌ MongoDB connection error:", error);
+    console.error("❌ MongoDB connection error:", error.message);
     process.exit(1);
   }
 };
 
-const PORT = process.env.PORT || 5000;
-
-// Proper startup sequence - wait for DB before starting server
-const start = async () => {
-  await connectDB(); // wait for DB
-  startServer();     // then start server
-};
-
-start();
-
-// Essential Routes
-app.use('/api/products', productRoutes);
-app.use('/api/users', userRoutes);
-app.use('/api/auth', authRoutes);
-app.use('/api/cart', cartRoutes);
+// ─── Routes ───────────────────────────────────────────────────────────────────
+app.use('/api/products',    productRoutes);
+app.use('/api/users',       userRoutes);
+app.use('/api/auth',        authRoutes);
+app.use('/api/cart',        cartRoutes);
 app.use('/api/collections', collectionRoutes);
-app.use('/api/categories', categoryRoutes);
-app.use('/api/orders', storeOrderRoutes);
-app.use('/api/payments', paymentRoutes);
+app.use('/api/categories',  categoryRoutes);
+app.use('/api/orders',      storeOrderRoutes);
+app.use('/api/payments',    paymentRoutes);
 
 // Serve uploaded files
 app.use('/uploads', express.static('uploads'));
 
-// Health check
+// ─── Health Check ─────────────────────────────────────────────────────────────
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'OK', timestamp: new Date().toISOString() });
-});
-
-// Root route - API information
-app.get('/', (req, res) => {
   res.json({
-    name: 'Black Locust API',
-    version: '2.0.0',
-    status: 'Running',
-    features: {
-      authentication: 'JWT + 2FA + device tracking',
-      authorization: 'Role-based access control',
-      payment: 'Stripe + Razorpay + webhook security',
-      orderProcessing: 'Atomic transactions + inventory management',
-      analytics: 'Real-time + comprehensive reporting',
-      notifications: 'Email + SMS + push notifications',
-      search: 'Advanced filtering + aggregation',
-      security: 'Input sanitization + rate limiting + audit trails'
-    },
-    endpoints: {
-      health: '/api/health',
-      authentication: {
-        register: '/api/auth/register',
-        login: '/api/auth/login',
-        profile: '/api/auth/profile',
-        'change-password': '/api/auth/change-password',
-        'enable-2fa': '/api/auth/enable-2fa',
-        activity: '/api/auth/activity',
-        'logout-all': '/api/auth/logout-all'
-      },
-      userManagement: {
-        profile: '/api/users/manage/profile',
-        analytics: '/api/users/manage/analytics'
-      },
-      productManagement: {
-        search: '/api/products/manage/search',
-        categories: '/api/products/manage/categories',
-        details: '/api/products/manage/:id',
-        reviews: '/api/products/manage/:id/reviews',
-        wishlist: '/api/products/manage/:id/wishlist',
-        analytics: '/api/products/manage/analytics'
-      },
-      orders: {
-        create: 'POST /api/orders',
-        list: 'GET /api/orders/my-orders',
-        details: 'GET /api/orders/:orderId',
-        cancel: 'PUT /api/orders/:orderId/cancel',
-        track: '/api/orders/:orderId/track',
-        'status-update': '/api/orders/:orderId/status',
-        analytics: '/api/orders/analytics/summary'
-      },
-      payments: {
-        'razorpay-key': 'GET /api/payments/razorpay/key',
-        'razorpay-order': 'POST /api/payments/razorpay/order',
-        'razorpay-verify': 'POST /api/payments/razorpay/verify'
-      },
-      analytics: {
-        dashboard: '/api/analytics/dashboard',
-        sales: '/api/analytics/sales',
-        products: '/api/analytics/products',
-        customers: '/api/analytics/customers',
-        realtime: '/api/analytics/realtime'
-      },
-      notifications: {
-        welcome: '/api/notifications/welcome',
-        'order-confirmation': '/api/notifications/order-confirmation',
-        'payment-confirmation': '/api/notifications/payment-confirmation',
-        'password-reset': '/api/notifications/password-reset',
-        'email-verification': '/api/notifications/email-verification',
-        bulk: '/api/notifications/bulk',
-        status: '/api/notifications/status/:messageId'
-      },
-      products: '/api/products',
-      users: '/api/users',
-      cart: '/api/cart',
-      email: '/api/email'
-    },
-    documentation: 'https://github.com/black-locust/api-docs',
-    timestamp: new Date().toISOString()
+    status: 'OK',
+    timestamp: new Date().toISOString(),
+    dbState: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
   });
 });
 
-// Error handling middleware
+// ─── Root ─────────────────────────────────────────────────────────────────────
+app.get('/', (req, res) => {
+  res.json({ name: 'Black Locust API', version: '2.0.0', status: 'Running' });
+});
+
+// ─── Error Handler ────────────────────────────────────────────────────────────
 app.use((err, req, res, next) => {
-  console.error(err.stack);
+  console.error('Error:', err.message);
   res.status(err.status || 500).json({
     message: err.message || 'Internal Server Error',
-    error: process.env.NODE_ENV === 'development' ? err : {}
+    error: process.env.NODE_ENV === 'development' ? err.stack : {},
   });
 });
 
-// 404 handler
+// 404
 app.use((req, res) => {
-  res.status(404).json({ message: 'Route not found' });
+  res.status(404).json({ message: `Route not found: ${req.originalUrl}` });
 });
 
-// Simple server startup - Render compatible
-const startServer = () => {
+// ─── Start ────────────────────────────────────────────────────────────────────
+const PORT = process.env.PORT || 5000;
+
+const start = async () => {
+  await connectDB();
   app.listen(PORT, () => {
     console.log(`🚀 Server running on port ${PORT}`);
     console.log(`📱 Environment: ${process.env.NODE_ENV || 'development'}`);
+    console.log(`🌐 Allowed origins: ${allowedOrigins.join(', ')} + *.onrender.com + *.vercel.app`);
   });
 };
+
+start();
