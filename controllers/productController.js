@@ -234,6 +234,7 @@ export const getProductsSimple = async (req, res) => {
 
     const products = await Product.find(query)
       .populate("category", "name slug")
+      .populate("collection", "name slug image")
       .select("name description price category collection brand images sizes colors totalStock isFeatured isNewArrival isTrending rating numReviews tags material careInstructions isActive createdAt")
       .sort(sort)
       .lean()
