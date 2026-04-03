@@ -135,7 +135,8 @@ const helmetConfig = {
       styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
       fontSrc: ["'self'", "https://fonts.gstatic.com"],
       imgSrc: ["'self'", "data:", "https:"],
-      scriptSrc: ["'self'"],
+      // Allow Razorpay/Stripe hosted checkout scripts used by the frontend.
+      scriptSrc: ["'self'", "https://checkout.razorpay.com", "https://js.stripe.com"],
       connectSrc: ["'self'", "https://api.stripe.com", "https://api.razorpay.com"],
       frameSrc: ["'self'", "https://js.stripe.com", "https://api.razorpay.com"]
     }
@@ -301,10 +302,9 @@ const limiter = rateLimit({
 const setupSecurity = (app) => {
   // Helmet for security headers
   app.use(helmet(helmetConfig));
-  
-  // Rate limiting
-  app.use('/api/', securityConfig.generalLimiter);
-  // app.use('/api/auth/login', securityConfig.loginLimiter); // DISABLED FOR DEVELOPMENT
+
+  // Rate limiting is handled by server.js (kept centralized to avoid double throttling).
+  // app.use('/api/', securityConfig.generalLimiter);
   
   // Data sanitization
   app.use(sanitizeInput);
@@ -317,10 +317,6 @@ const setupSecurity = (app) => {
   
   // CSRF protection disabled temporarily
   // app.use(csrfProtection);
-  
-  // Body parser with size limits
-  app.use(express.json({ limit: '10kb' }));
-  app.use(express.urlencoded({ extended: true, limit: '10kb' }));
 };
 
 export {

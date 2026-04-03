@@ -1,13 +1,14 @@
 import express from 'express';
 import mongoose from 'mongoose';
 import cors from 'cors';
-import helmet from 'helmet';
 import compression from 'compression';
 import morgan from 'morgan';
 import rateLimit from 'express-rate-limit';
 import net from 'net';
 import { execSync } from 'child_process';
 import 'dotenv/config';
+
+import { setupSecurity } from './middleware/security.js';
 
 // Import only essential routes that exist
 import productRoutes from './routes/productRoutes.js';
@@ -43,13 +44,7 @@ app.use(cors({
   credentials: true
 }));
 
-// Remove problematic security middleware that might interfere
-// setupSecurity(app);
-
 // Additional middleware
-app.use(helmet({
-  crossOriginResourcePolicy: { policy: "cross-origin" }
-}));
 app.use(compression());
 app.use(morgan('dev'));
 app.use(express.json());
@@ -58,10 +53,13 @@ app.use(express.urlencoded({ extended: true }));
 // 🔥 Add trust proxy setting for PM2 and proxy environments
 app.set('trust proxy', 1);
 
+// Security hardening (CSP/sanitization/etc). Keep it after body parsers.
+setupSecurity(app);
+
 // Rate limiting - increased for development
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 1000 // increased from 100 to 1000 requests per windowMs
+  max: 200 // protect against abuse while keeping ecommerce flows working
 });
 app.use('/api/', limiter);
 

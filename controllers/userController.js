@@ -174,9 +174,16 @@ export const refreshAccessToken = async (req, res) => {
       });
     }
 
+    if (!process.env.JWT_REFRESH_SECRET) {
+      return res.status(503).json({
+        success: false,
+        message: 'Server auth not configured'
+      });
+    }
+
     const decoded = jwt.verify(
       incomingRefresh,
-      process.env.JWT_REFRESH_SECRET || 'fallback_refresh_secret'
+      process.env.JWT_REFRESH_SECRET
     );
 
     const user = await User.findById(decoded.id);

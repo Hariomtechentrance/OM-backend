@@ -40,17 +40,39 @@ export const createOrder = async (req, res) => {
       shippingAddress,
       paymentMethod,
       codConfirmation,
-      itemsPrice,
-      taxPrice,
-      shippingPrice,
-      totalPrice
+      promoCode
     } = req.body;
 
     if (!orderItems?.length) {
       return res.status(400).json({ message: 'No order items' });
     }
 
-    if (paymentMethod === 'cod') {
+    if (!shippingAddress || typeof shippingAddress !== 'object') {
+      return res.status(400).json({ message: 'Shipping address is required' });
+    }
+
+    // Basic shipping address validation to reduce fraud & bad data.
+    const emailRegex = /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/;
+    const phoneStr = String(shippingAddress.phone || '');
+    if (
+      !shippingAddress.firstName ||
+      !shippingAddress.lastName ||
+      !shippingAddress.email ||
+      !emailRegex.test(shippingAddress.email) ||
+      !phoneStr ||
+      phoneStr.replace(/\\D/g, '').length < 10 ||
+      !shippingAddress.address ||
+      !shippingAddress.city ||
+      !shippingAddress.state ||
+      !shippingAddress.pincode ||
+      !shippingAddress.country
+    ) {
+      return res.status(400).json({ message: 'Invalid shipping address' });
+    }
+
+    const normalizedPaymentMethod = paymentMethod === 'cod' ? 'cod' : 'razorpay';
+
+    if (normalizedPaymentMethod === 'cod') {
       if (
         !codConfirmation?.paid ||
         Number(codConfirmation?.amount) < 100
@@ -86,7 +108,11 @@ export const createOrder = async (req, res) => {
         });
       }
 
-      const price = Number(item.price) || product.price;
+      // Prevent price/tax tampering: always use the product's current price from DB.
+      const price = Number(product.price);
+      if (!Number.isFinite(price) || price < 0) {
+        return res.status(400).json({ message: 'Invalid product price' });
+      }
       const size = item.size || 'Default';
       const color = item.color || 'Default';
       const name = item.name || product.name;
@@ -110,18 +136,29 @@ export const createOrder = async (req, res) => {
       });
     }
 
+    // Only allow known promo codes (client cannot force discounts).
+    const normalizedPromo = typeof promoCode === 'string' ? promoCode.trim().toLowerCase() : '';
+    const itemsPriceComputed = lines.reduce((sum, l) => sum + l.subtotal, 0);
+    const shippingPriceComputed = itemsPriceComputed > 999 ? 0 : 50;
+    const taxPriceComputed = 0;
+    const discountComputed = normalizedPromo === 'save10' ? itemsPriceComputed * 0.1 : 0;
+    const totalPriceComputed = Math.max(
+      0,
+      itemsPriceComputed + shippingPriceComputed - discountComputed
+    );
+
     const order = await StoreOrder.create({
       orderNumber: StoreOrder.generateOrderNumber(),
       user: req.user._id,
       items: lines,
       shippingAddress,
-      paymentMethod: paymentMethod || 'razorpay',
-      paymentStatus: paymentMethod === 'cod' ? 'paid' : 'pending',
-      itemsPrice: Number(itemsPrice) || 0,
-      taxPrice: Number(taxPrice) || 0,
-      shippingPrice: Number(shippingPrice) || 0,
-      totalPrice: Number(totalPrice) || lines.reduce((s, l) => s + l.subtotal, 0),
-      codConfirmation: paymentMethod === 'cod' ? codConfirmation : undefined,
+      paymentMethod: normalizedPaymentMethod,
+      paymentStatus: normalizedPaymentMethod === 'cod' ? 'paid' : 'pending',
+      itemsPrice: Number(itemsPriceComputed) || 0,
+      taxPrice: Number(taxPriceComputed) || 0,
+      shippingPrice: Number(shippingPriceComputed) || 0,
+      totalPrice: Math.round(totalPriceComputed * 100) / 100,
+      codConfirmation: normalizedPaymentMethod === 'cod' ? codConfirmation : undefined,
       status: 'pending'
     });
 
