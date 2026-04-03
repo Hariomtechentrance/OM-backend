@@ -98,9 +98,9 @@ router.post("/make-admin", async (req, res) => {
   }
 });
 
-router.get("/", protect, authorize("admin"), getAllUsers);
-router.put("/:id/role", protect, authorize("admin"), updateUserRole);
-router.put("/:id", protect, authorize("admin"), updateUserStatus);
+router.get("/", protect, authorize("admin", "super admin"), getAllUsers);
+router.put("/:id/role", protect, authorize("admin", "super admin"), updateUserRole);
+router.put("/:id", protect, authorize("admin", "super admin"), updateUserStatus);
 
 router.get("/verify-email/:token", verifyEmail);
 router.post("/resend-verification", resendVerification);
