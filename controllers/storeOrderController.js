@@ -53,8 +53,7 @@ export const createOrder = async (req, res) => {
     if (paymentMethod === 'cod') {
       if (
         !codConfirmation?.paid ||
-        Number(codConfirmation?.amount) < 100 ||
-        !codConfirmation?.razorpayPaymentId
+        Number(codConfirmation?.amount) < 100
       ) {
         return res.status(400).json({
           message: 'COD requires a ₹100 confirmation payment'
@@ -204,5 +203,90 @@ export const getOrderById = async (req, res) => {
     return res.json(order);
   } catch (err) {
     return res.status(500).json({ message: err.message });
+  }
+};
+
+// GET /api/orders/:id/track
+export const getOrderTrack = async (req, res) => {
+  try {
+    const order = await StoreOrder.findById(req.params.id).lean();
+    if (!order) return res.status(404).json({ message: 'Order not found' });
+
+    if (
+      String(order.user) !== String(req.user._id) &&
+      !adminRoles.includes(req.user.role)
+    ) {
+      return res.status(403).json({ message: 'Not authorized' });
+    }
+
+    const trackingNumber = order.shiprocket?.awbNumber;
+    const trackingUrl = order.shiprocket?.trackingUrl;
+
+    const timeline = [
+      {
+        status: 'pending',
+        title: 'Order Placed',
+        description: 'Your order has been received',
+        timestamp: order.createdAt,
+        completed: true
+      }
+    ];
+
+    if (['processing', 'shipped', 'delivered'].includes(order.status)) {
+      timeline.push({
+        status: 'processing',
+        title: 'Order Processing',
+        description: 'Your order is being prepared for shipment',
+        timestamp: order.updatedAt,
+        completed: true
+      });
+    }
+
+    if (['shipped', 'delivered'].includes(order.status)) {
+      timeline.push({
+        status: 'shipped',
+        title: 'Order Shipped',
+        description: trackingNumber
+          ? `Your order has shipped. AWB: ${trackingNumber}`
+          : 'Your order has shipped',
+        timestamp: order.updatedAt,
+        completed: true
+      });
+    }
+
+    if (order.status === 'delivered') {
+      timeline.push({
+        status: 'delivered',
+        title: 'Order Delivered',
+        description: 'Your order has been delivered successfully',
+        timestamp: order.updatedAt,
+        completed: true
+      });
+    }
+
+    if (order.status === 'cancelled') {
+      timeline.push({
+        status: 'cancelled',
+        title: 'Order Cancelled',
+        description: 'Your order has been cancelled',
+        timestamp: order.updatedAt,
+        completed: true
+      });
+    }
+
+    return res.json({
+      success: true,
+      tracking: {
+        orderId: order._id,
+        orderNumber: order.orderNumber,
+        status: order.status,
+        paymentStatus: order.paymentStatus,
+        trackingNumber,
+        trackingUrl,
+        timeline
+      }
+    });
+  } catch (err) {
+    return res.status(500).json({ message: err.message || 'Track failed' });
   }
 };

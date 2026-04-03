@@ -46,7 +46,15 @@ const storeOrderSchema = new mongoose.Schema(
       default: 'pending'
     },
     razorpayOrderId: { type: String },
-    razorpayPaymentId: { type: String }
+    razorpayPaymentId: { type: String },
+    shiprocket: {
+      orderId: { type: String },
+      shipmentId: { type: String },
+      awbNumber: { type: String },
+      courierName: { type: String },
+      trackingUrl: { type: String },
+      raw: { type: mongoose.Schema.Types.Mixed }
+    }
   },
   { timestamps: true }
 );
