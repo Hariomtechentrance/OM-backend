@@ -97,7 +97,21 @@ GET /api/products/:id
 */
 export const getSingleProduct = async (req, res) => {
   try {
-    const product = await Product.findById(req.params.id);
+    let product;
+    
+    // Try to find by ObjectId first, then by string ID
+    if (mongoose.Types.ObjectId.isValid(req.params.id)) {
+      product = await Product.findById(req.params.id);
+    } else {
+      // If not a valid ObjectId, try to find by string ID or other fields
+      product = await Product.findOne({ 
+        $or: [
+          { id: req.params.id },
+          { slug: req.params.id },
+          { name: req.params.id }
+        ]
+      });
+    }
 
     if (!product) {
       return res.status(404).json({
