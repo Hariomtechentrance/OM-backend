@@ -327,3 +327,47 @@ export const getOrderTrack = async (req, res) => {
     return res.status(500).json({ message: err.message || 'Track failed' });
   }
 };
+
+// GET /api/orders/admin/all
+export const getAllOrdersAdmin = async (req, res) => {
+  try {
+    if (!adminRoles.includes(req.user.role)) {
+      return res.status(403).json({ message: 'Admin access required' });
+    }
+
+    const orders = await StoreOrder.find({})
+      .populate('user', 'name email')
+      .sort({ createdAt: -1 })
+      .lean();
+
+    return res.json({ success: true, orders });
+  } catch (err) {
+    return res.status(500).json({ message: err.message || 'Failed to fetch orders' });
+  }
+};
+
+// PUT /api/orders/:id/status (admin)
+export const updateOrderStatusAdmin = async (req, res) => {
+  try {
+    if (!adminRoles.includes(req.user.role)) {
+      return res.status(403).json({ message: 'Admin access required' });
+    }
+
+    const { status } = req.body;
+    const allowed = ['pending', 'processing', 'shipped', 'delivered', 'cancelled'];
+    if (!allowed.includes(status)) {
+      return res.status(400).json({ message: 'Invalid order status' });
+    }
+
+    const order = await StoreOrder.findById(req.params.id);
+    if (!order) return res.status(404).json({ message: 'Order not found' });
+
+    order.status = status;
+    if (status === 'cancelled') order.paymentStatus = order.paymentStatus === 'paid' ? 'paid' : 'failed';
+    await order.save();
+
+    return res.json({ success: true, order: order.toObject() });
+  } catch (err) {
+    return res.status(500).json({ message: err.message || 'Failed to update order status' });
+  }
+};
