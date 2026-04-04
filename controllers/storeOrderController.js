@@ -1,5 +1,7 @@
 import StoreOrder from '../models/StoreOrder.js';
 import Product from '../models/Product.js';
+import { getSiteSettingsDoc } from '../utils/siteSettings.js';
+import { effectiveDiscountPercent, priceAfterDiscount } from '../utils/discountPricing.js';
 
 const adminRoles = ['admin', 'super admin'];
 
@@ -85,6 +87,7 @@ export const createOrder = async (req, res) => {
 
     const lines = [];
     const productsToSave = [];
+    const siteSettings = await getSiteSettingsDoc();
 
     for (const item of orderItems) {
       const productId = item.product || item.productId;
@@ -108,11 +111,13 @@ export const createOrder = async (req, res) => {
         });
       }
 
-      // Prevent price/tax tampering: always use the product's current price from DB.
-      const price = Number(product.price);
-      if (!Number.isFinite(price) || price < 0) {
+      // Prevent price tampering: list price from DB, discount computed server-side.
+      const listPrice = Number(product.price);
+      if (!Number.isFinite(listPrice) || listPrice < 0) {
         return res.status(400).json({ message: 'Invalid product price' });
       }
+      const discPct = effectiveDiscountPercent(product, siteSettings);
+      const unitPrice = priceAfterDiscount(listPrice, discPct);
       const size = item.size || 'Default';
       const color = item.color || 'Default';
       const name = item.name || product.name;
@@ -120,6 +125,10 @@ export const createOrder = async (req, res) => {
         item.image ||
         (product.images?.[0]?.url ? product.images[0].url : '') ||
         (typeof product.images?.[0] === 'string' ? product.images[0] : '');
+      const skuCode =
+        typeof product.skuCode === 'string' && product.skuCode.trim()
+          ? product.skuCode.trim()
+          : '';
 
       reduceLineStock(product, qty, size, color);
       productsToSave.push(product);
@@ -127,12 +136,15 @@ export const createOrder = async (req, res) => {
       lines.push({
         product: product._id,
         name,
-        price,
+        skuCode,
+        listPrice,
+        discountPercentApplied: discPct,
+        price: unitPrice,
         quantity: qty,
         size,
         color,
         image,
-        subtotal: price * qty
+        subtotal: unitPrice * qty
       });
     }
 

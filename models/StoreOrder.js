@@ -8,6 +8,11 @@ const orderItemSchema = new mongoose.Schema(
       required: true
     },
     name: { type: String, required: true },
+    skuCode: { type: String, default: '' },
+    /** MRP / list price before discount */
+    listPrice: { type: Number, min: 0 },
+    discountPercentApplied: { type: Number, min: 0, max: 100, default: 0 },
+    /** Unit price charged (after discount) */
     price: { type: Number, required: true, min: 0 },
     quantity: { type: Number, required: true, min: 1 },
     size: { type: String, default: 'Default' },

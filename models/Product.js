@@ -147,6 +147,19 @@ const productSchema = new mongoose.Schema({
   isActive: {
     type: Boolean,
     default: true
+  },
+  /** inherit = use shop-wide discount; custom = use discountPercent on this product */
+  discountMode: {
+    type: String,
+    enum: ['inherit', 'custom'],
+    default: 'inherit'
+  },
+  /** Used when discountMode is custom (0–100) */
+  discountPercent: {
+    type: Number,
+    default: 0,
+    min: 0,
+    max: 100
   }
 }, {
   timestamps: true

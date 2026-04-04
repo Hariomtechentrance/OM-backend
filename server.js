@@ -20,6 +20,7 @@ import storeOrderRoutes from './routes/storeOrderRoutes.js';
 import paymentRoutes from './routes/paymentRoutes.js';
 import shiprocketRoutes from './routes/shiprocketRoutes.js';
 import authRoutes from './routes/auth.js';
+import siteSettingsRoutes from './routes/siteSettingsRoutes.js';
 
 const app = express();
 
@@ -97,6 +98,7 @@ const start = async () => {
 start();
 
 // Essential Routes
+app.use('/api/settings', siteSettingsRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/auth', authRoutes);

@@ -2,6 +2,8 @@ import mongoose from "mongoose";
 import Product from "../models/Product.js";
 import Category from "../models/Category.js";
 import Collection from "../models/Collection.js";
+import { getSiteSettingsDoc } from "../utils/siteSettings.js";
+import { enrichProductForStorefront } from "../utils/discountPricing.js";
 
 function escapeRegex(s) {
   return String(s).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -97,21 +99,7 @@ GET /api/products/:id
 */
 export const getSingleProduct = async (req, res) => {
   try {
-    let product;
-    
-    // Try to find by ObjectId first, then by string ID
-    if (mongoose.Types.ObjectId.isValid(req.params.id)) {
-      product = await Product.findById(req.params.id);
-    } else {
-      // If not a valid ObjectId, try to find by string ID or other fields
-      product = await Product.findOne({ 
-        $or: [
-          { id: req.params.id },
-          { slug: req.params.id },
-          { name: req.params.id }
-        ]
-      });
-    }
+    const product = await Product.findById(req.params.id).lean();
 
     if (!product) {
       return res.status(404).json({
@@ -120,9 +108,12 @@ export const getSingleProduct = async (req, res) => {
       });
     }
 
+    const site = await getSiteSettingsDoc();
+    const enriched = enrichProductForStorefront(product, site);
+
     res.json({
       success: true,
-      product
+      product: enriched
     });
   } catch (error) {
     res.status(500).json({
@@ -249,14 +240,19 @@ export const getProductsSimple = async (req, res) => {
     const products = await Product.find(query)
       .populate("category", "name slug")
       .populate("collection", "name slug image")
-      .select("name description price category collection brand images sizes colors totalStock isFeatured isNewArrival isTrending rating numReviews tags material careInstructions isActive createdAt")
+      .select(
+        "name description price category collection brand images sizes colors totalStock isFeatured isNewArrival isTrending rating numReviews tags material careInstructions isActive createdAt skuCode h1Heading specifications availability productLink discountMode discountPercent"
+      )
       .sort(sort)
       .lean()
       .limit(500);
 
+    const site = await getSiteSettingsDoc();
+    const enriched = products.map((p) => enrichProductForStorefront(p, site));
+
     res.json({
       success: true,
-      products
+      products: enriched
     });
 
   } catch (error) {
@@ -315,6 +311,29 @@ DELETE PRODUCT
 DELETE /api/products/:id
 ---------------------------------------------------------
 */
+/**
+ * Set every product to follow shop-wide discount (inherit mode).
+ * POST /api/products/admin/sync-discount-inherit
+ */
+export const syncAllProductsDiscountInherit = async (req, res) => {
+  try {
+    const result = await Product.updateMany(
+      {},
+      { $set: { discountMode: "inherit", discountPercent: 0 } }
+    );
+    return res.json({
+      success: true,
+      matchedCount: result.matchedCount,
+      modifiedCount: result.modifiedCount
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+};
+
 export const deleteProduct = async (req, res) => {
   try {
 
