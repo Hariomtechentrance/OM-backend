@@ -10,6 +10,11 @@ import {
   deleteProduct,
   syncAllProductsDiscountInherit
 } from "../controllers/productController.js";
+import {
+  getProductReviews,
+  createProductReview,
+  markReviewHelpful
+} from "../controllers/productReviewController.js";
 import { protect, authorize } from "../middleware/auth.js";
 
 // Configure multer for file uploads
@@ -24,6 +29,9 @@ router.post(
   syncAllProductsDiscountInherit
 );
 router.get("/", getProductsSimple);
+router.get("/:id/reviews", getProductReviews);
+router.post("/:id/reviews", protect, createProductReview);
+router.post("/:id/reviews/:reviewId/helpful", protect, markReviewHelpful);
 router.get("/:id", getSingleProduct);
 router.put("/:id", updateProduct);
 router.delete("/:id", deleteProduct);

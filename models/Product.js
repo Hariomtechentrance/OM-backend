@@ -18,8 +18,20 @@ const reviewSchema = new mongoose.Schema({
   },
   comment: {
     type: String,
-    required: true
-  }
+    required: true,
+    maxlength: 2000
+  },
+  /** Optional customer photo URLs (e.g. ImageKit / CDN) */
+  images: [{ type: String, trim: true }],
+  verifiedPurchase: {
+    type: Boolean,
+    default: false
+  },
+  /** Users who marked review helpful (dedupe votes) */
+  helpfulVoters: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User'
+  }]
 }, {
   timestamps: true
 });
@@ -160,19 +172,21 @@ const productSchema = new mongoose.Schema({
     default: 0,
     min: 0,
     max: 100
-  }
+  },
+  reviews: [reviewSchema]
 }, {
   timestamps: true
 });
 
-// Calculate average rating
+// Calculate average rating from embedded reviews
 productSchema.methods.calculateRating = function() {
-  if (this.reviews.length === 0) {
+  if (!this.reviews || this.reviews.length === 0) {
     this.rating = 0;
     this.numReviews = 0;
   } else {
     this.numReviews = this.reviews.length;
-    this.rating = this.reviews.reduce((acc, item) => item.rating + acc, 0) / this.reviews.length;
+    const sum = this.reviews.reduce((acc, item) => acc + item.rating, 0);
+    this.rating = Math.round((sum / this.reviews.length) * 10) / 10;
   }
 };
 

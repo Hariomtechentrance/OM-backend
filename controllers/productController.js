@@ -99,7 +99,7 @@ GET /api/products/:id
 */
 export const getSingleProduct = async (req, res) => {
   try {
-    const product = await Product.findById(req.params.id).lean();
+    const product = await Product.findById(req.params.id).select("-reviews").lean();
 
     if (!product) {
       return res.status(404).json({
