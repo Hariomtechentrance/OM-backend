@@ -29,9 +29,23 @@ const allowedOrigins = [
   "http://localhost:3000",
   "http://localhost:5002",
   "https://blacklocust-frontend.onrender.com",
+  "https://om-frontend-rsti.onrender.com",
   "https://blacklocust.in",
   "https://www.blacklocust.in"
 ];
+
+// Render / staging: set FRONTEND_URL and/or comma-separated ALLOWED_ORIGINS (no spaces after commas)
+if (process.env.FRONTEND_URL) {
+  const u = process.env.FRONTEND_URL.trim().replace(/\/+$/, "");
+  if (u && !allowedOrigins.includes(u)) allowedOrigins.push(u);
+}
+(process.env.ALLOWED_ORIGINS || "")
+  .split(",")
+  .map((s) => s.trim().replace(/\/+$/, ""))
+  .filter(Boolean)
+  .forEach((u) => {
+    if (!allowedOrigins.includes(u)) allowedOrigins.push(u);
+  });
 
 app.use(cors({
   origin: function (origin, callback) {
