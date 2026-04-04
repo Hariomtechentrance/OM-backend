@@ -24,14 +24,14 @@ const router = express.Router();
 
 // Validation
 const registerValidation = [
-  body("name").notEmpty(),
-  body("email").isEmail(),
-  body("password").isLength({ min: 6 })
+  body("name").trim().notEmpty().withMessage("Name is required"),
+  body("email").trim().isEmail().withMessage("Valid email is required"),
+  body("password").isLength({ min: 6 }).withMessage("Password must be at least 6 characters")
 ];
 
 const loginValidation = [
-  body("email").isEmail(),
-  body("password").notEmpty()
+  body("email").trim().isEmail().withMessage("Valid email is required"),
+  body("password").notEmpty().withMessage("Password is required")
 ];
 
 // Routes
@@ -97,14 +97,5 @@ router.post("/make-admin", async (req, res) => {
     });
   }
 });
-
-router.get("/", protect, authorize("admin", "super admin"), getAllUsers);
-router.put("/:id/role", protect, authorize("admin", "super admin"), updateUserRole);
-router.put("/:id", protect, authorize("admin", "super admin"), updateUserStatus);
-
-router.get("/verify-email/:token", verifyEmail);
-router.post("/resend-verification", resendVerification);
-router.post("/forgot-password", forgotPassword);
-router.post("/reset-password/:token", resetPassword);
 
 export default router;

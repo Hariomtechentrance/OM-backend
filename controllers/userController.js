@@ -7,6 +7,16 @@ import { generateAuthTokens } from '../middleware/auth.js';
 // REGISTER
 export const register = async (req, res) => {
   try {
+    // Check for validation errors
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({
+        success: false,
+        message: 'Validation failed',
+        errors: errors.array()
+      });
+    }
+
     const { name, email, password, phone } = req.body;
 
     const existingUser = await User.findOne({ email });
@@ -41,9 +51,10 @@ export const register = async (req, res) => {
       }
     });
   } catch (error) {
+    console.error('Registration error:', error);
     res.status(500).json({
       success: false,
-      message: 'Server error'
+      message: error.message || 'Server error'
     });
   }
 };
@@ -51,6 +62,16 @@ export const register = async (req, res) => {
 // LOGIN
 export const login = async (req, res) => {
   try {
+    // Check for validation errors
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({
+        success: false,
+        message: 'Validation failed',
+        errors: errors.array()
+      });
+    }
+
     const { email, password } = req.body;
 
     const user = await User.findOne({ email }).select('+password');
@@ -94,103 +115,47 @@ export const login = async (req, res) => {
       }
     });
   } catch (error) {
+    console.error('Login error:', error);
     res.status(500).json({
       success: false,
-      message: 'Server error'
+      message: error.message || 'Server error'
     });
   }
 };
 
-// GET PROFILE (✅ FIXED _id)
-export const getProfile = async (req, res) => {
+export const adminLogin = async (req, res) => {
   try {
-    const user = await User.findById(req.user._id).select('-password');
+    const { email, password } = req.body;
 
-    res.json({
-      success: true,
-      user
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: 'Server error'
-    });
-  }
-};
+    const user = await User.findOne({ email }).select('+password');
 
-// @desc    Logout user / clear cookie
-// @route   POST /api/users/logout
-// @access  Private
-export const logout = async (req, res) => {
-  try {
-    // For JWT, client-side token removal is handled
-    res.json({
-      success: true,
-      message: 'Logged out successfully'
-    });
-  } catch (error) {
-    console.error('Logout error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Server error'
-    });
-  }
-};
-
-// UPDATE PROFILE (✅ FIXED _id)
-export const updateProfile = async (req, res) => {
-  try {
-    const { name, phone } = req.body;
-
-    const user = await User.findByIdAndUpdate(
-      req.user._id,
-      { name, phone },
-      { new: true }
-    );
-
-    res.json({
-      success: true,
-      user
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: 'Server error'
-    });
-  }
-};
-
-// @desc    Refresh access token
-// @route   POST /api/users/refresh-token
-// @access  Public
-export const refreshAccessToken = async (req, res) => {
-  try {
-    const incomingRefresh = req.body.refreshToken;
-
-    if (!incomingRefresh) {
+    if (!user) {
       return res.status(401).json({
         success: false,
-        message: 'Refresh token required'
+        message: 'Invalid credentials'
       });
     }
 
-    if (!process.env.JWT_REFRESH_SECRET) {
-      return res.status(503).json({
+    if (user.role !== 'admin' && user.role !== 'super admin') {
+      return res.status(401).json({
         success: false,
-        message: 'Server auth not configured'
+        message: 'Admin access required'
       });
     }
 
-    const decoded = jwt.verify(
-      incomingRefresh,
-      process.env.JWT_REFRESH_SECRET
-    );
-
-    const user = await User.findById(decoded.id);
-    if (!user || !user.isActive) {
+    if (!user.isActive) {
       return res.status(401).json({
         success: false,
-        message: 'Invalid refresh token'
+        message: 'Account is deactivated'
+      });
+    }
+
+    const isMatch = await user.comparePassword(password);
+
+    if (!isMatch) {
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid credentials'
       });
     }
 
@@ -201,45 +166,128 @@ export const refreshAccessToken = async (req, res) => {
       success: true,
       token: accessToken,
       refreshToken,
-      tokenExpiry
+      tokenExpiry,
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role
+      }
     });
   } catch (error) {
-    console.error('Refresh token error:', error);
-    res.status(401).json({
+    console.error('Admin login error:', error);
+    res.status(500).json({
       success: false,
-      message: 'Invalid or expired refresh token'
+      message: error.message || 'Server error'
     });
   }
 };
 
-// @desc    Get all users (admin only)
-// @route   GET /api/users
-// @access  Private/Admin
+export const getProfile = async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id).select('-password');
+    
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    res.json({
+      success: true,
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        phone: user.phone,
+        addresses: user.addresses || [],
+        avatar: user.avatar,
+        isActive: user.isActive,
+        isEmailVerified: user.isEmailVerified,
+        createdAt: user.createdAt
+      }
+    });
+  } catch (error) {
+    console.error('Get profile error:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Server error'
+    });
+  }
+};
+
+export const updateProfile = async (req, res) => {
+  try {
+    const { name, phone, addresses } = req.body;
+    const user = await User.findById(req.user.id);
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    if (name) user.name = name;
+    if (phone) user.phone = phone;
+    if (addresses) user.addresses = addresses;
+
+    await user.save();
+
+    res.json({
+      success: true,
+      message: 'Profile updated successfully',
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        phone: user.phone,
+        addresses: user.addresses || [],
+        avatar: user.avatar,
+        isActive: user.isActive,
+        isEmailVerified: user.isEmailVerified
+      }
+    });
+  } catch (error) {
+    console.error('Update profile error:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Server error'
+    });
+  }
+};
+
 export const getAllUsers = async (req, res) => {
   try {
     const users = await User.find({}).select('-password');
-    
     res.json({
       success: true,
       count: users.length,
-      users
+      users: users.map(u => ({
+        id: u._id,
+        name: u.name,
+        email: u.email,
+        role: u.role,
+        isActive: u.isActive,
+        createdAt: u.createdAt
+      }))
     });
   } catch (error) {
-    console.error('Get users error:', error);
+    console.error('Get all users error:', error);
     res.status(500).json({
       success: false,
-      message: 'Server error'
+      message: error.message || 'Server error'
     });
   }
 };
 
-// @desc    Update user role (admin only)
-// @route   PUT /api/users/:id/role
-// @access  Private/Admin
 export const updateUserRole = async (req, res) => {
   try {
-    const { role } = req.body;
-    const user = await User.findById(req.params.id);
+    const { userId, role } = req.body;
+    const user = await User.findById(userId);
 
     if (!user) {
       return res.status(404).json({
@@ -258,26 +306,22 @@ export const updateUserRole = async (req, res) => {
         id: user._id,
         name: user.name,
         email: user.email,
-        role: user.role,
-        isActive: user.isActive
+        role: user.role
       }
     });
   } catch (error) {
-    console.error('Update role error:', error);
+    console.error('Update user role error:', error);
     res.status(500).json({
       success: false,
-      message: 'Server error'
+      message: error.message || 'Server error'
     });
   }
 };
 
-// @desc    Update user status (admin only)
-// @route   PUT /api/users/:id
-// @access  Private/Admin
 export const updateUserStatus = async (req, res) => {
   try {
-    const { isActive } = req.body;
-    const user = await User.findById(req.params.id);
+    const { userId, isActive } = req.body;
+    const user = await User.findById(userId);
 
     if (!user) {
       return res.status(404).json({
@@ -301,22 +345,19 @@ export const updateUserStatus = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Update status error:', error);
+    console.error('Update user status error:', error);
     res.status(500).json({
       success: false,
-      message: 'Server error'
+      message: error.message || 'Server error'
     });
   }
 };
 
-// @desc    Verify email
-// @route   GET /api/users/verify-email/:token
-// @access  Public
 export const verifyEmail = async (req, res) => {
   try {
     const { token } = req.params;
-
     const user = await User.findOne({ verificationToken: token });
+
     if (!user) {
       return res.status(400).json({
         success: false,
@@ -330,44 +371,28 @@ export const verifyEmail = async (req, res) => {
 
     res.json({
       success: true,
-      message: 'Email verified successfully! You can now log in.'
+      message: 'Email verified successfully'
     });
   } catch (error) {
     console.error('Email verification error:', error);
     res.status(500).json({
       success: false,
-      message: 'Server error during email verification'
+      message: error.message || 'Server error'
     });
   }
 };
 
-// @desc    Resend verification email
-// @route   POST /api/users/resend-verification
-// @access  Public
 export const resendVerification = async (req, res) => {
   try {
     const { email } = req.body;
-
     const user = await User.findOne({ email });
+
     if (!user) {
       return res.status(404).json({
         success: false,
         message: 'User not found'
       });
     }
-
-    if (user.isEmailVerified) {
-      return res.status(400).json({
-        success: false,
-        message: 'Email is already verified'
-      });
-    }
-
-    const verificationToken = crypto.randomBytes(32).toString('hex');
-    user.verificationToken = verificationToken;
-    await user.save();
-
-    await emailService.sendVerificationEmail(email, verificationToken);
 
     res.json({
       success: true,
@@ -377,32 +402,22 @@ export const resendVerification = async (req, res) => {
     console.error('Resend verification error:', error);
     res.status(500).json({
       success: false,
-      message: 'Server error while resending verification'
+      message: error.message || 'Server error'
     });
   }
 };
 
-// @desc    Forgot password
-// @route   POST /api/users/forgot-password
-// @access  Public
 export const forgotPassword = async (req, res) => {
   try {
     const { email } = req.body;
-
     const user = await User.findOne({ email });
+
     if (!user) {
       return res.status(404).json({
         success: false,
         message: 'User not found'
       });
     }
-
-    const resetToken = crypto.randomBytes(32).toString('hex');
-    user.passwordResetToken = resetToken;
-    user.passwordResetExpires = Date.now() + 10 * 60 * 1000; // 10 minutes
-    await user.save();
-
-    await emailService.sendPasswordResetEmail(email, resetToken);
 
     res.json({
       success: true,
@@ -412,100 +427,67 @@ export const forgotPassword = async (req, res) => {
     console.error('Forgot password error:', error);
     res.status(500).json({
       success: false,
-      message: 'Server error while processing password reset'
+      message: error.message || 'Server error'
     });
   }
 };
 
-// @desc    Reset password
-// @route   POST /api/users/reset-password/:token
-// @access  Public
 export const resetPassword = async (req, res) => {
   try {
-    const { token } = req.params;
-    const { password } = req.body;
-
-    const user = await User.findOne({
-      passwordResetToken: token,
-      passwordResetExpires: { $gt: Date.now() }
-    });
+    const { token, newPassword } = req.body;
+    const user = await User.findOne({ passwordResetToken: token });
 
     if (!user) {
       return res.status(400).json({
         success: false,
-        message: 'Invalid or expired reset token'
+        message: 'Invalid reset token'
       });
     }
 
-    user.password = password;
+    user.password = newPassword;
     user.passwordResetToken = undefined;
     user.passwordResetExpires = undefined;
-    user.loginAttempts = 0;
-    user.accountLocked = false;
-    user.lockoutUntil = undefined;
     await user.save();
 
     res.json({
       success: true,
-      message: 'Password reset successfully! You can now log in.'
+      message: 'Password reset successfully'
     });
   } catch (error) {
     console.error('Reset password error:', error);
     res.status(500).json({
       success: false,
-      message: 'Server error while resetting password'
+      message: error.message || 'Server error'
     });
   }
 };
 
-// ADMIN LOGIN
-export const adminLogin = async (req, res) => {
+export const refreshAccessToken = async (req, res) => {
   try {
-    const email = String(req.body.email || '')
-      .trim()
-      .toLowerCase();
-    const password = req.body.password;
-
-    const user = await User.findOne({
-      email,
-      role: { $in: ['admin', 'super admin'] }
-    }).select('+password');
+    const { refreshToken } = req.body;
+    const user = await User.findOne({ 'refreshTokens.token': refreshToken });
 
     if (!user) {
       return res.status(401).json({
         success: false,
-        message: 'Admin credentials invalid'
+        message: 'Invalid refresh token'
       });
     }
 
-    const isMatch = await user.comparePassword(password);
-
-    if (!isMatch) {
-      return res.status(401).json({
-        success: false,
-        message: 'Admin credentials invalid'
-      });
-    }
-
-    const { accessToken, refreshToken } = generateAuthTokens(user._id);
+    const { accessToken, refreshToken: newRefreshToken } = generateAuthTokens(user._id);
     const tokenExpiry = new Date(Date.now() + 14 * 60 * 1000).toISOString();
 
     res.json({
       success: true,
       token: accessToken,
-      refreshToken,
-      tokenExpiry,
-      user: {
-        id: user._id,
-        name: user.name,
-        email: user.email,
-        role: user.role
-      }
+      refreshToken: newRefreshToken,
+      tokenExpiry
     });
   } catch (error) {
+    console.error('Refresh token error:', error);
     res.status(500).json({
       success: false,
-      message: 'Server error'
+      message: error.message || 'Server error'
     });
   }
 };

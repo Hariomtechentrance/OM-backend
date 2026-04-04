@@ -307,7 +307,7 @@ const setupSecurity = (app) => {
   // app.use('/api/', securityConfig.generalLimiter);
   
   // Data sanitization
-  app.use(sanitizeInput);
+  // app.use(sanitizeInput); // Temporarily disabled for debugging
   
   // Prevent parameter pollution
   app.use(hpp());
