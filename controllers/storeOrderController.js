@@ -54,22 +54,41 @@ export const createOrder = async (req, res) => {
     }
 
     // Basic shipping address validation to reduce fraud & bad data.
-    const emailRegex = /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/;
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     const phoneStr = String(shippingAddress.phone || '');
+    
+    // Check if we have either fullName OR both firstName and lastName
+    const hasName = shippingAddress.fullName || (shippingAddress.firstName && shippingAddress.lastName);
+    
+    // Improved phone validation for Indian numbers
+    const cleanPhone = phoneStr.replace(/\D/g, '');
+    const isValidPhone = cleanPhone.length >= 10 && cleanPhone.length <= 12;
+    
     if (
-      !shippingAddress.firstName ||
-      !shippingAddress.lastName ||
+      !hasName ||
       !shippingAddress.email ||
       !emailRegex.test(shippingAddress.email) ||
       !phoneStr ||
-      phoneStr.replace(/\\D/g, '').length < 10 ||
+      !isValidPhone ||
       !shippingAddress.address ||
       !shippingAddress.city ||
       !shippingAddress.state ||
       !shippingAddress.pincode ||
       !shippingAddress.country
     ) {
-      return res.status(400).json({ message: 'Invalid shipping address' });
+      return res.status(400).json({ 
+        message: 'Invalid shipping address',
+        missingFields: {
+          name: !hasName ? 'fullName or firstName+lastName required' : null,
+          email: !shippingAddress.email ? 'Valid email required' : null,
+          phone: !isValidPhone ? 'Valid phone required (10-12 digits)' : null,
+          address: !shippingAddress.address ? 'Address required' : null,
+          city: !shippingAddress.city ? 'City required' : null,
+          state: !shippingAddress.state ? 'State required' : null,
+          pincode: !shippingAddress.pincode ? 'Pincode required' : null,
+          country: !shippingAddress.country ? 'Country required' : null
+        }
+      });
     }
 
     const normalizedPaymentMethod = paymentMethod === 'cod' ? 'cod' : 'razorpay';
