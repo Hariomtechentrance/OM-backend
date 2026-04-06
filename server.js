@@ -31,7 +31,8 @@ const allowedOrigins = [
   "https://blacklocust-frontend.onrender.com",
   "https://om-frontend-rsti.onrender.com",
   "https://blacklocust.in",
-  "https://www.blacklocust.in"
+  "https://www.blacklocust.in",
+  "https://api.blacklocust.in"
 ];
 
 // Render / staging: set FRONTEND_URL and/or comma-separated ALLOWED_ORIGINS (no spaces after commas)
