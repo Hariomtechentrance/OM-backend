@@ -1,11 +1,25 @@
 import express from 'express';
-import { protect } from '../middleware/auth.js';
-import { createShiprocketShipment } from '../controllers/shiprocketController.js';
+import {
+  createShipment,
+  trackShipment,
+  cancelShipment,
+  getAvailableCouriers
+} from '../controllers/shiprocketController.js';
+import { protect, authorize } from '../middleware/auth.js';
 
 const router = express.Router();
 
-// Creates Shiprocket adhoc shipment for an existing StoreOrder.
-router.post('/shiprocket/shipment', protect, createShiprocketShipment);
+// Create shipment for an order
+router.post('/ship-order/:orderId', protect, authorize('admin', 'super admin'), createShipment);
+
+// Track a shipment
+router.get('/track/:shipmentId', protect, authorize('admin', 'super admin'), trackShipment);
+
+// Cancel a shipment
+router.post('/cancel/:shipmentId', protect, authorize('admin', 'super admin'), cancelShipment);
+
+// Get available couriers for a pincode
+router.get('/couriers', protect, authorize('admin', 'super admin'), getAvailableCouriers);
 
 export default router;
 

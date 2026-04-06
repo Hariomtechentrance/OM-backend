@@ -1,13 +1,229 @@
+import ShiprocketService from '../services/shiprocketService.js';
 import StoreOrder from '../models/StoreOrder.js';
 
-const SHIPROCKET_BASE_URL = 'https://apiv2.shiprocket.in/v1/external';
+// Create a new shipment for an order
+export const createShipment = async (req, res) => {
+  try {
+    const { orderId } = req.params;
+    
+    if (!orderId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Order ID is required'
+      });
+    }
 
-const adminRoles = ['admin', 'super admin'];
+    // Find the order
+    const order = await StoreOrder.findById(orderId);
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        message: 'Order not found'
+      });
+    }
 
-const requireEnv = (key) => {
-  const val = process.env[key];
-  if (!val) throw new Error(`Missing env var: ${key}`);
-  return val;
+    // Check if order is already shipped
+    if (order.status === 'shipped') {
+      return res.status(400).json({
+        success: false,
+        message: 'Order is already shipped'
+      });
+    }
+
+    // Check if Shiprocket is configured
+    if (!ShiprocketService.isConfigured()) {
+      return res.status(500).json({
+        success: false,
+        message: 'Shiprocket service is not configured'
+      });
+    }
+
+    // Create shipment with Shiprocket
+    const shipmentResult = await ShiprocketService.createShipment({
+      orderNumber: order.orderNumber,
+      createdAt: order.createdAt,
+      shippingAddress: order.shippingAddress,
+      items: order.items,
+      paymentMethod: order.paymentMethod,
+      itemsPrice: order.itemsPrice,
+      totalPrice: order.totalPrice
+    });
+
+    if (!shipmentResult.success) {
+      return res.status(500).json({
+        success: false,
+        message: 'Failed to create shipment',
+        error: shipmentResult.error
+      });
+    }
+
+    // Update order with shipment details
+    order.shiprocket = {
+      orderId: shipmentResult.data?.shipment_id || '',
+      shipmentId: shipmentResult.data?.shipment_id || '',
+      awbNumber: shipmentResult.data?.awb_code || '',
+      courierName: shipmentResult.data?.courier_name || '',
+      trackingUrl: shipmentResult.data?.tracking_url || '',
+      raw: shipmentResult.data
+    };
+
+    // Update order status to shipped
+    order.status = 'shipped';
+    order.shippedAt = new Date();
+
+    await order.save();
+
+    console.log('✅ Order shipped successfully:', order.orderNumber);
+
+    res.json({
+      success: true,
+      message: 'Order shipped successfully',
+      order: order.toObject(),
+      shipment: shipmentResult.data
+    });
+
+  } catch (error) {
+    console.error('❌ Create shipment error:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Failed to create shipment'
+    });
+  }
+};
+
+// Track a shipment
+export const trackShipment = async (req, res) => {
+  try {
+    const { shipmentId } = req.params;
+    
+    if (!shipmentId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Shipment ID is required'
+      });
+    }
+
+    // Check if Shiprocket is configured
+    if (!ShiprocketService.isConfigured()) {
+      return res.status(500).json({
+        success: false,
+        message: 'Shiprocket service is not configured'
+      });
+    }
+
+    const trackingResult = await ShiprocketService.trackShipment(shipmentId);
+
+    if (!trackingResult.success) {
+      return res.status(500).json({
+        success: false,
+        message: 'Failed to track shipment',
+        error: trackingResult.error
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'Shipment tracked successfully',
+      tracking: trackingResult.data
+    });
+
+  } catch (error) {
+    console.error('❌ Track shipment error:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Failed to track shipment'
+    });
+  }
+};
+
+// Cancel a shipment
+export const cancelShipment = async (req, res) => {
+  try {
+    const { shipmentId } = req.params;
+    
+    if (!shipmentId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Shipment ID is required'
+      });
+    }
+
+    // Check if Shiprocket is configured
+    if (!ShiprocketService.isConfigured()) {
+      return res.status(500).json({
+        success: false,
+        message: 'Shiprocket service is not configured'
+      });
+    }
+
+    const cancelResult = await ShiprocketService.cancelShipment(shipmentId);
+
+    if (!cancelResult.success) {
+      return res.status(500).json({
+        success: false,
+        message: 'Failed to cancel shipment',
+        error: cancelResult.error
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'Shipment cancelled successfully',
+      data: cancelResult.data
+    });
+
+  } catch (error) {
+    console.error('❌ Cancel shipment error:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Failed to cancel shipment'
+    });
+  }
+};
+
+// Get available couriers for a pincode
+export const getAvailableCouriers = async (req, res) => {
+  try {
+    const { pincode } = req.query;
+    
+    if (!pincode) {
+      return res.status(400).json({
+        success: false,
+        message: 'Pincode is required'
+      });
+    }
+
+    // Check if Shiprocket is configured
+    if (!ShiprocketService.isConfigured()) {
+      return res.status(500).json({
+        success: false,
+        message: 'Shiprocket service is not configured'
+      });
+    }
+
+    const couriersResult = await ShiprocketService.getAvailableCouriers(pincode);
+
+    if (!couriersResult.success) {
+      return res.status(500).json({
+        success: false,
+        message: 'Failed to get available couriers',
+        error: couriersResult.error
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'Available couriers retrieved successfully',
+      couriers: couriersResult.data
+    });
+
+  } catch (error) {
+    console.error('❌ Get couriers error:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Failed to get available couriers'
+    });
+  }
 };
 
 async function shiprocketLogin() {
