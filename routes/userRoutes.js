@@ -43,6 +43,11 @@ router.post("/admin/login", loginValidation, adminLogin);
 router.get("/profile", protect, getProfile);
 router.put("/profile", protect, updateProfile);
 
+// Admin routes
+router.get("/all", protect, authorize('admin', 'super admin'), getAllUsers);
+router.put("/:id/role", protect, authorize('admin', 'super admin'), updateUserRole);
+router.put("/:id", protect, authorize('admin', 'super admin'), updateUserStatus);
+
 router.get("/test-users", async (req, res) => {
   try {
     const users = await User.find({}).select('-password');
