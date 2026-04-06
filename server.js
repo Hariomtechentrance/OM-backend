@@ -50,7 +50,14 @@ if (process.env.FRONTEND_URL) {
 
 app.use(cors({
   origin: function (origin, callback) {
-    if (!origin || allowedOrigins.includes(origin)) {
+    // Allow requests with no origin (like mobile apps or curl)
+    if (!origin) return callback(null, true);
+    
+    // Log the origin for debugging
+    console.log("🔍 CORS Request from origin:", origin);
+    
+    // Check if origin is allowed
+    if (allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
       console.log("❌ Blocked by CORS:", origin);
