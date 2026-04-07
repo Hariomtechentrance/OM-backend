@@ -27,13 +27,17 @@ const app = express();
 // CORS - MUST be first middleware
 const allowedOrigins = [
   "http://localhost:3000",
-  "http://localhost:5002",
-  "https://blacklocust-frontend.onrender.com",
-  "https://om-frontend-rsti.onrender.com",
   "https://blacklocust.in",
-  "https://www.blacklocust.in",
-  "https://api.blacklocust.in"
+  "https://www.blacklocust.in"
 ];
+
+app.use(cors({
+  origin: allowedOrigins,
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+  exposedHeaders: ['Content-Range', 'X-Content-Range']
+}));
 
 // Render / staging: set FRONTEND_URL and/or comma-separated ALLOWED_ORIGINS (no spaces after commas)
 if (process.env.FRONTEND_URL) {
