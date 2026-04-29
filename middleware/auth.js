@@ -105,13 +105,13 @@ export const generateAuthTokens = (userId) => {
   }
 
   const accessToken = jwt.sign(
-    { id: userId },
+    { userId: userId }, // ✅ FIXED: Use userId instead of id
     JWT_SECRET,
     { expiresIn: '15m' }
   );
 
   const refreshToken = jwt.sign(
-    { id: userId },
+    { userId: userId }, // ✅ FIXED: Use userId instead of id
     JWT_REFRESH_SECRET,
     { expiresIn: '7d' }
   );
