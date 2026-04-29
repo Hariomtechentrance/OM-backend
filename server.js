@@ -28,7 +28,8 @@ const app = express();
 const allowedOrigins = [
   "http://localhost:3000",
   "https://blacklocust.in",
-  "https://www.blacklocust.in"
+  "https://www.blacklocust.in",
+  "https://blacklocust-backend.onrender.com"
 ];
 
 app.use(cors({
