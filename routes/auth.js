@@ -107,21 +107,22 @@ router.post('/register', async (req, res) => {
       });
     }
 
-    // Hash password
+    // Hash password using the security module
     console.log('Hashing password...');
-    const hashedPassword = await hashPassword(password);
-    console.log('Password hashed successfully');
+    // Note: The User model's pre-save hook will handle password hashing
+    // So we just pass the plain password here
+    console.log('Password validation complete');
 
     // Generate 2FA secret
     const twoFactorSecret = generate2FASecret();
     console.log('2FA secret generated');
 
-    // Create new user
+    // Create new user with plain password (model will hash it)
     console.log('Creating new user...');
     const user = new User({
       name,
       email,
-      password: hashedPassword,
+      password, // Plain password - model's pre-save hook will hash it
       phone,
       twoFactorSecret,
       isEmailVerified: false,
