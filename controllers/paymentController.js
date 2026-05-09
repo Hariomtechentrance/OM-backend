@@ -141,3 +141,49 @@ export const verifyRazorpayPayment = async (req, res) => {
     return res.status(500).json({ message: err.message || 'Verification failed' });
   }
 };
+
+/**
+ * POST /api/payments/cod/confirmation-order
+ * Creates a Razorpay order for the ₹100 COD confirmation fee.
+ * This is called BEFORE the store order is created — the user must pay ₹100
+ * to prove intent before the COD order is accepted.
+ */
+export const createCODConfirmationOrder = async (req, res) => {
+  try {
+    const keyId = process.env.RAZORPAY_KEY_ID;
+    const keySecret = process.env.RAZORPAY_KEY_SECRET;
+    if (!keyId || !keySecret) {
+      return res.status(503).json({
+        message: 'Razorpay is not configured (set RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET)'
+      });
+    }
+
+    const COD_FEE_RUPEES = 100;
+    const amountPaise = COD_FEE_RUPEES * 100; // 10000 paise
+
+    const Razorpay = (await import('razorpay')).default;
+    const rzp = new Razorpay({ key_id: keyId, key_secret: keySecret });
+
+    const order = await rzp.orders.create({
+      amount: amountPaise,
+      currency: 'INR',
+      receipt: `cod_confirm_${req.user?._id || 'guest'}_${Date.now()}`.slice(0, 40),
+      notes: {
+        purpose: 'COD Confirmation Fee',
+        userId: String(req.user?._id || ''),
+        amount_rupees: COD_FEE_RUPEES
+      }
+    });
+
+    return res.json({
+      success: true,
+      order,
+      orderId: order.id,
+      amount: COD_FEE_RUPEES,
+      amountPaise
+    });
+  } catch (err) {
+    console.error('createCODConfirmationOrder:', err);
+    return res.status(500).json({ message: err.message || 'Failed to create COD confirmation order' });
+  }
+};

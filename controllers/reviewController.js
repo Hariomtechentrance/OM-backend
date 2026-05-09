@@ -1,10 +1,10 @@
-const Product = require('../models/Product');
-const User = require('../models/User');
+import Product from '../models/Product.js';
+import userModel from '../models/userModel.js';
 
 // @desc    Create new review
 // @route   POST /api/reviews
 // @access  Private
-exports.createReview = async (req, res) => {
+export const createReview = async (req, res) => {
   try {
     const { productId, rating, comment } = req.body;
 
@@ -38,8 +38,19 @@ exports.createReview = async (req, res) => {
     product.rating = product.reviews.reduce((acc, item) => item.rating + acc, 0) / product.reviews.length;
 
     await product.save();
-
-    res.status(201).json({ message: 'Review added successfully' });
+    
+    res.status(201).json({ 
+      success: true,
+      message: 'Review added successfully',
+      review: {
+        id: review._id,
+        user: review.user,
+        name: review.name,
+        rating: review.rating,
+        comment: review.comment,
+        createdAt: review.createdAt
+      }
+    });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -48,7 +59,7 @@ exports.createReview = async (req, res) => {
 // @desc    Update review
 // @route   PUT /api/reviews/:productId
 // @access  Private
-exports.updateReview = async (req, res) => {
+export const updateReview = async (req, res) => {
   try {
     const { rating, comment } = req.body;
     const { productId } = req.params;
@@ -85,7 +96,7 @@ exports.updateReview = async (req, res) => {
 // @desc    Delete review
 // @route   DELETE /api/reviews/:productId
 // @access  Private
-exports.deleteReview = async (req, res) => {
+export const deleteReview = async (req, res) => {
   try {
     const { productId } = req.params;
 
@@ -124,7 +135,7 @@ exports.deleteReview = async (req, res) => {
 // @desc    Get product reviews
 // @route   GET /api/reviews/:productId
 // @access  Public
-exports.getProductReviews = async (req, res) => {
+export const getProductReviews = async (req, res) => {
   try {
     const { productId } = req.params;
     const { page = 1, limit = 10 } = req.query;
@@ -142,10 +153,20 @@ exports.getProductReviews = async (req, res) => {
     const reviews = product.reviews.slice(startIndex, endIndex);
 
     res.json({
+      success: true,
       reviews,
-      currentPage: Number(page),
-      totalPages: Math.ceil(product.reviews.length / limit),
-      totalReviews: product.reviews.length
+      summary: {
+        averageRating: product.rating || 0,
+        numReviews: product.reviews.length,
+        fiveStarCount: product.reviews.filter(r => r.rating === 5).length,
+        totalReviews: product.reviews.length
+      },
+      pagination: {
+        page: Number(page),
+        limit: Number(limit),
+        total: product.reviews.length,
+        pages: Math.ceil(product.reviews.length / limit)
+      }
     });
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -155,7 +176,7 @@ exports.getProductReviews = async (req, res) => {
 // @desc    Get user reviews
 // @route   GET /api/reviews/user
 // @access  Private
-exports.getUserReviews = async (req, res) => {
+export const getUserReviews = async (req, res) => {
   try {
     const products = await Product.find({ 'reviews.user': req.user._id })
       .populate('reviews.user', 'name avatar')

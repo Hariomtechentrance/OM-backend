@@ -91,16 +91,36 @@ export const createOrder = async (req, res) => {
       });
     }
 
-    const normalizedPaymentMethod = paymentMethod === 'cod' ? 'cod' : 'razorpay';
+    const normalizedPaymentMethod = paymentMethod === 'cod' ? 'cod' : paymentMethod === 'upi' ? 'upi' : paymentMethod === 'card' ? 'card' : 'razorpay';
 
     if (normalizedPaymentMethod === 'cod') {
       if (
         !codConfirmation?.paid ||
-        Number(codConfirmation?.amount) < 100
+        Number(codConfirmation?.amount) < 100 ||
+        !codConfirmation?.razorpayPaymentId ||
+        codConfirmation?.razorpayPaymentId === 'cod'
       ) {
         return res.status(400).json({
-          message: 'COD requires a ₹100 confirmation payment'
+          message: 'COD requires a ₹100 confirmation payment via Razorpay'
         });
+      }
+
+      // Verify the Razorpay signature for the COD confirmation payment
+      if (codConfirmation.razorpayOrderId && codConfirmation.razorpaySignature) {
+        const crypto = await import('crypto');
+        const secret = process.env.RAZORPAY_KEY_SECRET;
+        if (secret) {
+          const body = `${codConfirmation.razorpayOrderId}|${codConfirmation.razorpayPaymentId}`;
+          const expectedSig = crypto.default
+            .createHmac('sha256', secret)
+            .update(body)
+            .digest('hex');
+          if (expectedSig !== codConfirmation.razorpaySignature) {
+            return res.status(400).json({
+              message: 'COD confirmation payment verification failed — invalid signature'
+            });
+          }
+        }
       }
     }
 
@@ -184,12 +204,13 @@ export const createOrder = async (req, res) => {
       items: lines,
       shippingAddress,
       paymentMethod: normalizedPaymentMethod,
-      paymentStatus: normalizedPaymentMethod === 'cod' ? 'paid' : 'pending',
+      paymentStatus: normalizedPaymentMethod === 'cod' ? 'paid' : normalizedPaymentMethod === 'upi' ? 'paid' : normalizedPaymentMethod === 'card' ? 'paid' : 'pending',
       itemsPrice: Number(itemsPriceComputed) || 0,
       taxPrice: Number(taxPriceComputed) || 0,
       shippingPrice: Number(shippingPriceComputed) || 0,
       totalPrice: Math.round(totalPriceComputed * 100) / 100,
       codConfirmation: normalizedPaymentMethod === 'cod' ? codConfirmation : undefined,
+      paymentDetails: (normalizedPaymentMethod === 'upi' || normalizedPaymentMethod === 'card') ? req.body.paymentDetails : undefined,
       status: 'pending'
     });
 

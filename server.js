@@ -21,12 +21,15 @@ import paymentRoutes from './routes/paymentRoutes.js';
 import shiprocketRoutes from './routes/shiprocketRoutes.js';
 import authRoutes from './routes/auth.js';
 import siteSettingsRoutes from './routes/siteSettingsRoutes.js';
+import reviewRoutes from './routes/reviewRoutes.js';
 
 const app = express();
 
 // CORS - MUST be first middleware
 const allowedOrigins = [
   "http://localhost:3000",
+  "http://localhost:3001",
+  "http://localhost:3018",
   "https://blacklocust.in",
   "https://www.blacklocust.in",
   "https://blacklocust-backend.onrender.com"
@@ -135,6 +138,7 @@ app.use('/api/categories', categoryRoutes);
 app.use('/api/orders', storeOrderRoutes);
 app.use('/api/payments', paymentRoutes);
 app.use('/api/shipping', shiprocketRoutes);
+app.use('/api/reviews', reviewRoutes);
 
 // Serve uploaded files
 app.use('/uploads', express.static('uploads'));

@@ -52,6 +52,7 @@ const storeOrderSchema = new mongoose.Schema(
     },
     razorpayOrderId: { type: String },
     razorpayPaymentId: { type: String },
+    paymentDetails: { type: mongoose.Schema.Types.Mixed }, // For UPI payments
     shiprocket: {
       orderId: { type: String },
       shipmentId: { type: String },
