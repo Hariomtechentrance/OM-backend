@@ -4,13 +4,11 @@ import cors from 'cors';
 import compression from 'compression';
 import morgan from 'morgan';
 import rateLimit from 'express-rate-limit';
-import net from 'net';
-import { execSync } from 'child_process';
 import 'dotenv/config';
 
 import { setupSecurity } from './middleware/security.js';
 
-// Import only essential routes that exist
+// Import routes
 import productRoutes from './routes/productRoutes.js';
 import userRoutes from './routes/userRoutes.js';
 import cartRoutes from './routes/cartRoutes.js';
@@ -25,7 +23,7 @@ import reviewRoutes from './routes/reviewRoutes.js';
 
 const app = express();
 
-// CORS - MUST be first middleware
+// ✅ CORS - Single block only (fixes duplicate CORS bug)
 const allowedOrigins = [
   "http://localhost:3000",
   "http://localhost:3001",
@@ -35,15 +33,7 @@ const allowedOrigins = [
   "https://blacklocust-backend.onrender.com"
 ];
 
-app.use(cors({
-  origin: allowedOrigins,
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
-  exposedHeaders: ['Content-Range', 'X-Content-Range']
-}));
-
-// Render / staging: set FRONTEND_URL and/or comma-separated ALLOWED_ORIGINS (no spaces after commas)
+// Add env-based origins
 if (process.env.FRONTEND_URL) {
   const u = process.env.FRONTEND_URL.trim().replace(/\/+$/, "");
   if (u && !allowedOrigins.includes(u)) allowedOrigins.push(u);
@@ -58,13 +48,8 @@ if (process.env.FRONTEND_URL) {
 
 app.use(cors({
   origin: function (origin, callback) {
-    // Allow requests with no origin (like mobile apps or curl)
+    // Allow requests with no origin (mobile apps, curl, Postman)
     if (!origin) return callback(null, true);
-    
-    // Log the origin for debugging
-    console.log("🔍 CORS Request from origin:", origin);
-    
-    // Check if origin is allowed
     if (allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
@@ -72,7 +57,10 @@ app.use(cors({
       callback(new Error("Not allowed by CORS"));
     }
   },
-  credentials: true
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+  exposedHeaders: ['Content-Range', 'X-Content-Range']
 }));
 
 // Additional middleware
@@ -81,53 +69,22 @@ app.use(morgan('dev'));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// 🔥 Add trust proxy setting for PM2 and proxy environments
+// Trust proxy for Render / PM2 environments
 app.set('trust proxy', 1);
 
-// Security hardening (CSP/sanitization/etc). Keep it after body parsers.
+// Security hardening (after body parsers)
 setupSecurity(app);
 
-// Rate limiting - increased for development
+// ✅ Rate limiting - increased to handle mobile users on shared IPs
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 200 // protect against abuse while keeping ecommerce flows working
+  max: 500,
+  standardHeaders: true,
+  legacyHeaders: false,
 });
 app.use('/api/', limiter);
 
-import createSuperAdmin from './utils/createSuperAdmin.js';
-import createAdmin from './seed/createAdmin.js';
-
-// Database connection
-const connectDB = async () => {
-  try {
-    console.log("👉 MONGO_URI:", process.env.MONGO_URI); // DEBUG
-
-    const conn = await mongoose.connect(process.env.MONGO_URI);
-
-    console.log(`✅ MongoDB Connected: ${conn.connection.host}`);
-    
-    // Create super admin if none exists
-    await createSuperAdmin();
-    
-    // Create admin if none exists
-    await createAdmin();
-  } catch (error) {
-    console.error("❌ MongoDB connection error:", error);
-    process.exit(1);
-  }
-};
-
-const PORT = process.env.PORT || 5000;
-
-// Proper startup sequence - wait for DB before starting server
-const start = async () => {
-  await connectDB(); // wait for DB
-  startServer();     // then start server
-};
-
-start();
-
-// Essential Routes
+// ✅ All routes registered BEFORE start() is called
 app.use('/api/settings', siteSettingsRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/users', userRoutes);
@@ -148,7 +105,7 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'OK', timestamp: new Date().toISOString() });
 });
 
-// Root route - API information
+// Root route
 app.get('/', (req, res) => {
   res.json({
     name: 'Black Locust API',
@@ -201,28 +158,10 @@ app.get('/', (req, res) => {
         'razorpay-order': 'POST /api/payments/razorpay/order',
         'razorpay-verify': 'POST /api/payments/razorpay/verify'
       },
-      analytics: {
-        dashboard: '/api/analytics/dashboard',
-        sales: '/api/analytics/sales',
-        products: '/api/analytics/products',
-        customers: '/api/analytics/customers',
-        realtime: '/api/analytics/realtime'
-      },
-      notifications: {
-        welcome: '/api/notifications/welcome',
-        'order-confirmation': '/api/notifications/order-confirmation',
-        'payment-confirmation': '/api/notifications/payment-confirmation',
-        'password-reset': '/api/notifications/password-reset',
-        'email-verification': '/api/notifications/email-verification',
-        bulk: '/api/notifications/bulk',
-        status: '/api/notifications/status/:messageId'
-      },
       products: '/api/products',
       users: '/api/users',
       cart: '/api/cart',
-      email: '/api/email'
     },
-    documentation: 'https://github.com/black-locust/api-docs',
     timestamp: new Date().toISOString()
   });
 });
@@ -241,10 +180,54 @@ app.use((req, res) => {
   res.status(404).json({ message: 'Route not found' });
 });
 
-// Simple server startup - Render compatible
+// ─── Database connection ───────────────────────────────────────────────────────
+import createSuperAdmin from './utils/createSuperAdmin.js';
+import createAdmin from './seed/createAdmin.js';
+
+const connectDB = async () => {
+  try {
+    console.log("👉 Connecting to MongoDB...");
+    const conn = await mongoose.connect(process.env.MONGO_URI);
+    console.log(`✅ MongoDB Connected: ${conn.connection.host}`);
+    await createSuperAdmin();
+    await createAdmin();
+  } catch (error) {
+    console.error("❌ MongoDB connection error:", error);
+    process.exit(1);
+  }
+};
+
+// ─── Server startup ────────────────────────────────────────────────────────────
+const PORT = process.env.PORT || 5000;
+
 const startServer = () => {
   app.listen(PORT, () => {
     console.log(`🚀 Server running on port ${PORT}`);
     console.log(`📱 Environment: ${process.env.NODE_ENV || 'development'}`);
+
+    // ✅ Keep Render free tier awake - ping every 14 minutes
+    if (process.env.NODE_ENV === 'production') {
+      const serverUrl = process.env.RENDER_EXTERNAL_URL ||
+        'https://om-backend-q11a.onrender.com';
+
+      setInterval(async () => {
+        try {
+          const res = await fetch(`${serverUrl}/api/health`);
+          console.log(`✅ Keep-alive ping: ${res.status}`);
+        } catch (err) {
+          console.log('⚠️ Keep-alive ping failed:', err.message);
+        }
+      }, 14 * 60 * 1000); // 14 minutes
+
+      console.log(`🏓 Keep-alive ping started → ${serverUrl}/api/health`);
+    }
   });
 };
+
+// ✅ start() called LAST - after all routes and handlers are registered
+const start = async () => {
+  await connectDB();
+  startServer();
+};
+
+start();
