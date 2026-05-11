@@ -99,6 +99,9 @@ GET /api/products/:id
 */
 export const getSingleProduct = async (req, res) => {
   try {
+    const { includeRelated = false } = req.query;
+    
+    // Get main product
     const product = await Product.findById(req.params.id).select("-reviews").lean();
 
     if (!product) {
@@ -111,10 +114,72 @@ export const getSingleProduct = async (req, res) => {
     const site = await getSiteSettingsDoc();
     const enriched = enrichProductForStorefront(product, site);
 
-    res.json({
+    // Prepare response
+    const response = {
       success: true,
       product: enriched
-    });
+    };
+
+    // If related products requested, include them in same call
+    if (includeRelated === 'true') {
+      try {
+        // Get related products efficiently using MongoDB aggregation
+        const relatedProducts = await Product.aggregate([
+          {
+            $match: {
+              $and: [
+                { isActive: true },
+                { _id: { $ne: product._id } }
+              ]
+            }
+          },
+          {
+            $match: {
+              $or: [
+                // Same collection
+                ...(product.collection ? [{ collection: product.collection._id || product.collection }] : []),
+                // Same category
+                ...(product.category ? [{ category: product.category._id || product.category }] : [])
+              ]
+            }
+          },
+          {
+            $sample: { size: 4 } // Get 4 random related products
+          },
+          {
+            $project: {
+              name: 1,
+              price: 1,
+              mrp: 1,
+              images: 1,
+              image: 1,
+              imageUrl: 1,
+              isNewArrival: 1,
+              newArrival: 1,
+              isFeatured: 1,
+              featured: 1,
+              isTrending: 1,
+              trending: 1,
+              collection: 1,
+              category: 1,
+              skuCode: 1,
+              h1Heading: 1,
+              specifications: 1
+            }
+          }
+        ]);
+
+        // Enrich related products with pricing
+        const enrichedRelated = relatedProducts.map(p => enrichProductForStorefront(p, site));
+        
+        response.relatedProducts = enrichedRelated;
+      } catch (error) {
+        console.error('Error fetching related products:', error);
+        response.relatedProducts = [];
+      }
+    }
+
+    res.json(response);
   } catch (error) {
     res.status(500).json({
       success: false,

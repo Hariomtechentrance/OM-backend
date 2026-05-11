@@ -191,3 +191,30 @@ productSchema.methods.calculateRating = function() {
 };
 
 export default mongoose.model('Product', productSchema);
+
+// Database indexes for performance optimization
+productSchema.index({ isActive: 1 });
+productSchema.index({ category: 1 });
+productSchema.index({ collection: 1 });
+productSchema.index({ name: 'text' });
+productSchema.index({ 
+  isActive: 1, 
+  category: 1, 
+  collection: 1 
+});
+productSchema.index({ 
+  isActive: 1, 
+  isNewArrival: 1 
+});
+productSchema.index({ 
+  isActive: 1, 
+  isFeatured: 1 
+});
+productSchema.index({ 
+  isActive: 1, 
+  isTrending: 1 
+});
+productSchema.index({ 
+  isActive: 1, 
+  brand: 1 
+});
