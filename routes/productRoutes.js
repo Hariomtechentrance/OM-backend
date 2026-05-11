@@ -6,6 +6,7 @@ import {
   createProduct,
   getProductsSimple,
   getSingleProduct,
+  getHomepageData,
   updateProduct,
   deleteProduct,
   syncAllProductsDiscountInherit
@@ -29,6 +30,7 @@ router.post(
   syncAllProductsDiscountInherit
 );
 router.get("/", getProductsSimple);
+router.get("/homepage", getHomepageData);
 router.get("/:id/reviews", getProductReviews);
 router.post("/:id/reviews", protect, createProductReview);
 router.post("/:id/reviews/:reviewId/helpful", protect, markReviewHelpful);
