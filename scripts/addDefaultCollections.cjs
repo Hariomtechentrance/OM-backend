@@ -1,8 +1,8 @@
 const mongoose = require('mongoose');
 const Collection = require('../models/Collection.js');
 
-// MongoDB connection
-mongoose.connect('mongodb://localhost:27017/black-locust');
+// MongoDB connection - use the same connection as server
+mongoose.connect('mongodb+srv://blacklocust:Blacklocust123@ac-6opvme3-shard-00-00.ztbjisr.mongodb.net/black-locust?retryWrites=true&w=majority&appName=BlackLocust');
 
 const defaultCollections = [
   {
@@ -89,12 +89,17 @@ const defaultCollections = [
 
 async function addDefaultCollections() {
   try {
+    // Wait for connection to be established
+    await new Promise((resolve) => {
+      mongoose.connection.once('open', resolve);
+    });
+
     // Clear existing collections
-    await Collection.deleteMany({});
+    await mongoose.connection.db.collection('collections').deleteMany({});
     console.log('Cleared existing collections');
 
     // Add default collections
-    const insertedCollections = await Collection.insertMany(defaultCollections);
+    const insertedCollections = await mongoose.connection.db.collection('collections').insertMany(defaultCollections);
     console.log(`Added ${insertedCollections.length} default collections:`);
     
     insertedCollections.forEach(collection => {

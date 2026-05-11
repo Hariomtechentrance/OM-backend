@@ -26,3 +26,31 @@ export const getCollections = async (req, res) => {
     res.status(500).json({ success: false, message: error.message });
   }
 };
+
+export const createCollection = async (req, res) => {
+  try {
+    const { name, slug, description, showInNavbar, isActive, collectionType, order, image } = req.body;
+    
+    // Create new collection
+    const newCollection = new Collection({
+      name,
+      slug,
+      description,
+      showInNavbar,
+      isActive,
+      collectionType,
+      order,
+      image
+    });
+    
+    await newCollection.save();
+    
+    res.status(201).json({ 
+      success: true, 
+      message: 'Collection created successfully',
+      collection: newCollection
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
