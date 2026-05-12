@@ -54,7 +54,12 @@ app.use(cors({
       callback(null, true);
     } else {
       console.log("❌ Blocked by CORS:", origin);
-      callback(new Error("Not allowed by CORS"));
+      // For images, allow all origins as fallback
+      if (origin && (origin.includes('localhost') || origin.includes('127.0.0.1'))) {
+        callback(null, true);
+      } else {
+        callback(new Error("Not allowed by CORS"));
+      }
     }
   },
   credentials: true,
@@ -97,8 +102,33 @@ app.use('/api/payments', paymentRoutes);
 app.use('/api/shipping', shiprocketRoutes);
 app.use('/api/reviews', reviewRoutes);
 
-// Serve uploaded files
-app.use('/uploads', express.static('uploads'));
+// Serve uploaded files with enhanced CORS for images
+app.use('/uploads', express.static('uploads', {
+  setHeaders: (res, path) => {
+    // Add cache headers for better performance
+    res.set('Cache-Control', 'public, max-age=86400'); // 24 hours
+    res.set('Access-Control-Allow-Origin', '*'); // Allow all origins for images
+    res.set('Cross-Origin-Resource-Policy', 'cross-origin'); // Allow cross-origin resource sharing
+  }
+}));
+
+// Serve public images (hero images, collection images, etc.)
+app.use('/images', express.static('public/images', {
+  setHeaders: (res, path) => {
+    res.set('Cache-Control', 'public, max-age=86400'); // 24 hours
+    res.set('Access-Control-Allow-Origin', '*'); // Allow all origins for images
+    res.set('Cross-Origin-Resource-Policy', 'cross-origin'); // Allow cross-origin resource sharing
+  }
+}));
+
+// Fallback image serving for different paths
+app.use('/static', express.static('public', {
+  setHeaders: (res, path) => {
+    res.set('Cache-Control', 'public, max-age=86400'); // 24 hours
+    res.set('Access-Control-Allow-Origin', '*'); // Allow all origins for images
+    res.set('Cross-Origin-Resource-Policy', 'cross-origin'); // Allow cross-origin resource sharing
+  }
+}));
 
 // Health check
 app.get('/api/health', (req, res) => {
