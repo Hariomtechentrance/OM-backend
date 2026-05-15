@@ -1,6 +1,135 @@
 import crypto from 'crypto';
 import StoreOrder from '../models/StoreOrder.js';
 
+/**
+ * POST /api/payments/razorpay/create-upi-order
+ * Creates a Razorpay order specifically for UPI payment
+ */
+export const createUPIOrder = async (req, res) => {
+  try {
+    console.log('🔵 createUPIOrder called');
+    console.log('Request body:', req.body);
+    console.log('User:', req.user?._id);
+    
+    const keyId = process.env.RAZORPAY_KEY_ID;
+    const keySecret = process.env.RAZORPAY_KEY_SECRET;
+    
+    console.log('Razorpay Key ID:', keyId ? `${keyId.substring(0, 10)}...` : 'NOT SET');
+    console.log('Razorpay Secret:', keySecret ? 'SET' : 'NOT SET');
+    
+    if (!keyId || !keySecret) {
+      console.error('❌ Razorpay credentials not configured');
+      return res.status(503).json({
+        message: 'Razorpay is not configured (set RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET)'
+      });
+    }
+
+    const { amount, currency = 'INR', receipt, notes } = req.body;
+    
+    console.log('Amount received:', amount, 'Type:', typeof amount);
+    
+    if (!amount || amount <= 0) {
+      console.error('❌ Invalid amount:', amount);
+      return res.status(400).json({ message: 'Valid amount is required' });
+    }
+
+    // Amount should already be in rupees from frontend
+    const amountPaise = Math.round(amount * 100);
+    
+    console.log('Amount in paise:', amountPaise);
+
+    const Razorpay = (await import('razorpay')).default;
+    const rzp = new Razorpay({ key_id: keyId, key_secret: keySecret });
+
+    console.log('Creating Razorpay order...');
+    
+    const orderOptions = {
+      amount: amountPaise,
+      currency,
+      receipt: receipt || `upi_${Date.now()}`,
+      notes: notes || {}
+    };
+    
+    console.log('Order options:', orderOptions);
+
+    const order = await rzp.orders.create(orderOptions);
+    
+    console.log('✅ Razorpay order created:', order.id);
+
+    return res.json({ 
+      success: true,
+      order 
+    });
+  } catch (err) {
+    console.error('❌ createUPIOrder error:', err);
+    console.error('Error stack:', err.stack);
+    return res.status(500).json({ 
+      message: err.message || 'Failed to create UPI order',
+      error: process.env.NODE_ENV === 'development' ? err.message : undefined
+    });
+  }
+};
+
+/**
+ * POST /api/payments/razorpay/verify-upi
+ * Verifies UPI payment signature
+ */
+export const verifyUPIPayment = async (req, res) => {
+  try {
+    console.log('🔵 verifyUPIPayment called');
+    console.log('Request body:', req.body);
+    
+    const secret = process.env.RAZORPAY_KEY_SECRET;
+    if (!secret) {
+      console.error('❌ Razorpay secret not configured');
+      return res.status(503).json({ message: 'Razorpay not configured' });
+    }
+
+    const {
+      razorpay_order_id,
+      razorpay_payment_id,
+      razorpay_signature
+    } = req.body;
+
+    if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
+      console.error('❌ Missing Razorpay fields');
+      return res.status(400).json({ message: 'Missing Razorpay fields' });
+    }
+
+    const body = `${razorpay_order_id}|${razorpay_payment_id}`;
+    const expected = crypto.createHmac('sha256', secret).update(body).digest('hex');
+
+    console.log('Signature verification:');
+    console.log('Expected:', expected);
+    console.log('Received:', razorpay_signature);
+    console.log('Match:', expected === razorpay_signature);
+
+    if (expected !== razorpay_signature) {
+      console.error('❌ Invalid payment signature');
+      return res.status(400).json({ 
+        success: false,
+        message: 'Invalid payment signature' 
+      });
+    }
+
+    console.log('✅ UPI payment verified successfully');
+
+    return res.json({ 
+      success: true,
+      message: 'UPI payment verified successfully',
+      paymentId: razorpay_payment_id,
+      orderId: razorpay_order_id
+    });
+  } catch (err) {
+    console.error('❌ verifyUPIPayment error:', err);
+    console.error('Error stack:', err.stack);
+    return res.status(500).json({ 
+      message: err.message || 'Verification failed',
+      error: process.env.NODE_ENV === 'development' ? err.message : undefined
+    });
+  }
+};
+
 /** GET /api/payments/razorpay/key — publishable key only */
 export const getRazorpayKey = async (req, res) => {
   const keyId = process.env.RAZORPAY_KEY_ID;
