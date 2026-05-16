@@ -2,73 +2,83 @@ import crypto from 'crypto';
 import StoreOrder from '../models/StoreOrder.js';
 
 /**
- * POST /api/payments/razorpay/create-upi-order
- * Creates a Razorpay order specifically for UPI payment
+ * POST /api/payments/razorpay/upi-collect
+ * Sends a UPI Collect request directly to the verified UPI ID
+ * This bypasses the Razorpay modal and sends notification directly to user's phone
  */
-export const createUPIOrder = async (req, res) => {
+export const sendUPICollectRequest = async (req, res) => {
   try {
-    console.log('🔵 createUPIOrder called');
+    console.log('🔵 sendUPICollectRequest called');
     console.log('Request body:', req.body);
     console.log('User:', req.user?._id);
     
     const keyId = process.env.RAZORPAY_KEY_ID;
     const keySecret = process.env.RAZORPAY_KEY_SECRET;
     
-    console.log('Razorpay Key ID:', keyId ? `${keyId.substring(0, 10)}...` : 'NOT SET');
-    console.log('Razorpay Secret:', keySecret ? 'SET' : 'NOT SET');
-    
     if (!keyId || !keySecret) {
       console.error('❌ Razorpay credentials not configured');
       return res.status(503).json({
-        message: 'Razorpay is not configured (set RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET)'
+        message: 'Razorpay is not configured'
       });
     }
 
-    const { amount, currency = 'INR', receipt, notes } = req.body;
-    
-    console.log('Amount received:', amount, 'Type:', typeof amount);
+    const { amount, vpa, orderId } = req.body;
     
     if (!amount || amount <= 0) {
-      console.error('❌ Invalid amount:', amount);
       return res.status(400).json({ message: 'Valid amount is required' });
     }
 
-    // Amount should already be in rupees from frontend
+    if (!vpa) {
+      return res.status(400).json({ message: 'UPI ID (VPA) is required' });
+    }
+
+    // Validate UPI ID format
+    const upiRegex = /^[a-zA-Z0-9._-]+@[a-zA-Z0-9]+$/;
+    if (!upiRegex.test(vpa)) {
+      return res.status(400).json({ message: 'Invalid UPI ID format' });
+    }
+
     const amountPaise = Math.round(amount * 100);
     
+    console.log('Creating UPI Collect request for VPA:', vpa);
     console.log('Amount in paise:', amountPaise);
 
     const Razorpay = (await import('razorpay')).default;
     const rzp = new Razorpay({ key_id: keyId, key_secret: keySecret });
 
-    console.log('Creating Razorpay order...');
-    
+    // Create Razorpay order
     const orderOptions = {
       amount: amountPaise,
-      currency,
-      receipt: receipt || `upi_${Date.now()}`,
-      notes: notes || {}
+      currency: 'INR',
+      receipt: orderId || `upi_collect_${Date.now()}`,
+      notes: {
+        vpa: vpa,
+        paymentType: 'upi_collect'
+      }
     };
-    
-    console.log('Order options:', orderOptions);
 
     const order = await rzp.orders.create(orderOptions);
-    
     console.log('✅ Razorpay order created:', order.id);
 
+    // Return order details
+    // Frontend will use this to track payment status
     return res.json({ 
       success: true,
-      order 
+      order: order,
+      vpa: vpa,
+      message: `Payment request sent to ${vpa}. Please check your phone and approve the payment.`
     });
+    
   } catch (err) {
-    console.error('❌ createUPIOrder error:', err);
+    console.error('❌ sendUPICollectRequest error:', err);
     console.error('Error stack:', err.stack);
     return res.status(500).json({ 
-      message: err.message || 'Failed to create UPI order',
+      message: err.message || 'Failed to send UPI Collect request',
       error: process.env.NODE_ENV === 'development' ? err.message : undefined
     });
   }
 };
+
 
 /**
  * POST /api/payments/razorpay/verify-upi
