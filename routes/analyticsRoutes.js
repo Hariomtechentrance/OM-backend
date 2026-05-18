@@ -1,19 +1,14 @@
-const express = require('express');
+import express from 'express';
+import { trackActivity, getAnalyticsDashboard, getUserJourney } from '../controllers/analyticsController.js';
+import { protect } from '../middleware/auth.js';
+
 const router = express.Router();
-const {
-  getDashboardAnalytics,
-  getSalesAnalytics,
-  getProductAnalytics,
-  getCustomerAnalytics,
-  getInventoryAnalytics
-} = require('../controllers/analyticsController');
-const { protect, authorize } = require('../middleware/auth');
 
-// All analytics routes are admin-only
-router.get('/dashboard', protect, authorize('admin'), getDashboardAnalytics);
-router.get('/sales', protect, authorize('admin'), getSalesAnalytics);
-router.get('/products', protect, authorize('admin'), getProductAnalytics);
-router.get('/customers', protect, authorize('admin'), getCustomerAnalytics);
-router.get('/inventory', protect, authorize('admin'), getInventoryAnalytics);
+// Public route - track user activity (no auth required)
+router.post('/track', trackActivity);
 
-module.exports = router;
+// Admin routes - view analytics (protected routes)
+router.get('/dashboard', protect, getAnalyticsDashboard);
+router.get('/journey/:sessionId', protect, getUserJourney);
+
+export default router;

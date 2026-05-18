@@ -63,6 +63,16 @@ const orderSchema = new mongoose.Schema({
     postalCode: { type: String, required: true },
     country: { type: String, required: true, default: 'India' }
   },
+  deliverySpeed: {
+    type: String,
+    enum: ['normal', 'quick'],
+    default: 'normal'
+  },
+  deliveryFee: {
+    type: Number,
+    default: 0,
+    min: 0
+  },
   billingAddress: {
     name: { type: String },
     phone: { type: String },

@@ -17,7 +17,10 @@ const userSchema = new mongoose.Schema({
   },
   password: {
     type: String,
-    required: [true, 'Password is required'],
+    required: function() {
+      // Password not required for social login users
+      return !this.googleId && !this.facebookId;
+    },
     minlength: 8,
     select: false
   },
@@ -25,6 +28,34 @@ const userSchema = new mongoose.Schema({
     type: String,
     enum: ['user', 'admin', 'super admin'],
     default: 'user'
+  },
+  // Social login fields
+  googleId: {
+    type: String,
+    sparse: true,
+    unique: true
+  },
+  facebookId: {
+    type: String,
+    sparse: true,
+    unique: true
+  },
+  profilePicture: {
+    type: String
+  },
+  authMethod: {
+    type: String,
+    enum: ['email', 'google', 'facebook', 'otp'],
+    default: 'email'
+  },
+  // Phone verification for OTP
+  phoneVerified: {
+    type: Boolean,
+    default: false
+  },
+  emailVerified: {
+    type: Boolean,
+    default: false
   },
   isActive: {
     type: Boolean,

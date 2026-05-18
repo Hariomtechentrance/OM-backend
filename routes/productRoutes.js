@@ -8,6 +8,7 @@ import {
   getSingleProduct,
   updateProduct,
   deleteProduct,
+  toggleProductStatus,
   syncAllProductsDiscountInherit
 } from "../controllers/productController.js";
 import {
@@ -32,6 +33,7 @@ router.get("/", getProductsSimple);
 router.get("/:id/reviews", getProductReviews);
 router.post("/:id/reviews", protect, createProductReview);
 router.post("/:id/reviews/:reviewId/helpful", protect, markReviewHelpful);
+router.put("/:id/toggle-status", toggleProductStatus);
 router.get("/:id", getSingleProduct);
 router.put("/:id", updateProduct);
 router.delete("/:id", deleteProduct);

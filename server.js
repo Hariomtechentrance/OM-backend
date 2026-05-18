@@ -20,6 +20,8 @@ import shiprocketRoutes from './routes/shiprocketRoutes.js';
 import authRoutes from './routes/auth.js';
 import siteSettingsRoutes from './routes/siteSettingsRoutes.js';
 import reviewRoutes from './routes/reviewRoutes.js';
+import promoBannerRoutes from './routes/promoBannerRoutes.js';
+import analyticsRoutes from './routes/analyticsRoutes.js';
 
 const app = express();
 
@@ -91,6 +93,8 @@ app.use('/api/', limiter);
 
 // ✅ All routes registered BEFORE start() is called
 app.use('/api/settings', siteSettingsRoutes);
+app.use('/api/promo-banner', promoBannerRoutes);
+app.use('/api/analytics', analyticsRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/auth', authRoutes);

@@ -197,11 +197,12 @@ GET /api/products
 */
 export const getProductsSimple = async (req, res) => {
   try {
-    const { category, collection, minPrice, maxPrice, sortBy, season, brand, sizes, colors } =
+    const { category, collection, minPrice, maxPrice, sortBy, season, brand, sizes, colors, includeInactive } =
       req.query;
     const search = typeof req.query.search === "string" ? req.query.search.trim() : "";
 
-    const filters = [{ isActive: true }];
+    // Only filter by isActive if includeInactive is not true (for admin panel)
+    const filters = includeInactive === 'true' ? [] : [{ isActive: true }];
 
     const truthy = (v) => v === true || v === "true" || v === "1";
     if (truthy(req.query.isNewArrival)) filters.push({ isNewArrival: true });
@@ -393,6 +394,35 @@ export const syncAllProductsDiscountInherit = async (req, res) => {
     });
   } catch (error) {
     return res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+};
+
+export const toggleProductStatus = async (req, res) => {
+  try {
+    const product = await Product.findById(req.params.id);
+
+    if (!product) {
+      return res.status(404).json({
+        success: false,
+        message: "Product not found"
+      });
+    }
+
+    // Toggle the isActive status
+    product.isActive = !product.isActive;
+    await product.save();
+
+    res.json({
+      success: true,
+      message: `Product ${product.isActive ? 'enabled' : 'disabled'} successfully`,
+      product
+    });
+
+  } catch (error) {
+    res.status(500).json({
       success: false,
       message: error.message
     });

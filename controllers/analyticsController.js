@@ -1,329 +1,271 @@
-const Order = require('../models/Order');
-const Product = require('../models/Product');
-const User = require('../models/User');
+import { UserActivity, DailyAnalytics, SearchAnalytics } from '../models/Analytics.js';
+import Product from '../models/Product.js';
 
-// @desc    Get dashboard analytics
-// @route   GET /api/analytics/dashboard
-// @access  Private/Admin
-exports.getDashboardAnalytics = async (req, res) => {
+// Track user activity
+export const trackActivity = async (req, res) => {
   try {
-    const { period = '30' } = req.query; // Default to last 30 days
+    const { sessionId, type, page, productId, searchQuery, metadata } = req.body;
+    const userId = req.user?._id;
+    const isLoggedIn = !!userId;
+
+    // Get device info from user agent
+    const userAgent = req.headers['user-agent'] || '';
+    const device = getDeviceType(userAgent);
+    const browser = getBrowser(userAgent);
+    const os = getOS(userAgent);
+
+    // Find or create user activity session
+    let activity = await UserActivity.findOne({ sessionId });
+
+    if (!activity) {
+      activity = new UserActivity({
+        sessionId,
+        userId,
+        isLoggedIn,
+        ipAddress: req.ip,
+        userAgent,
+        device,
+        browser,
+        os,
+        activities: []
+      });
+    }
+
+    // Add new activity
+    activity.activities.push({
+      type,
+      page,
+      productId,
+      searchQuery,
+      metadata,
+      timestamp: new Date()
+    });
+
+    activity.lastActivity = new Date();
+    activity.userId = userId || activity.userId;
+    activity.isLoggedIn = isLoggedIn;
+
+    // Update counters
+    if (type === 'page_view') activity.totalPageViews++;
+    if (type === 'search') activity.totalSearches++;
+
+    await activity.save();
+
+    // Update daily analytics
+    await updateDailyAnalytics(type, { sessionId, userId, isLoggedIn, device, browser, page, searchQuery, productId });
+
+    res.json({ success: true, message: 'Activity tracked' });
+  } catch (error) {
+    console.error('Track activity error:', error);
+    res.status(500).json({ success: false, message: 'Failed to track activity' });
+  }
+};
+
+// Get analytics dashboard data
+export const getAnalyticsDashboard = async (req, res) => {
+  try {
+    const { startDate, endDate } = req.query;
+    const start = startDate ? new Date(startDate) : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    const end = endDate ? new Date(endDate) : new Date();
+
+    // Get daily analytics for date range
+    const dailyStats = await DailyAnalytics.find({
+      date: { $gte: start, $lte: end }
+    }).sort({ date: 1 });
+
+    // Calculate totals
+    const totals = dailyStats.reduce((acc, day) => ({
+      visitors: acc.visitors + day.visitors.total,
+      uniqueVisitors: acc.uniqueVisitors + day.visitors.unique,
+      loggedInUsers: acc.loggedInUsers + day.visitors.loggedIn,
+      guestUsers: acc.guestUsers + day.visitors.guest,
+      pageViews: acc.pageViews + day.pageViews,
+      searches: acc.searches + day.searches.total,
+      productsViewed: acc.productsViewed + day.products.viewed,
+      addedToCart: acc.addedToCart + day.products.addedToCart,
+      orders: acc.orders + day.sales.totalOrders,
+      revenue: acc.revenue + day.sales.totalRevenue
+    }), {
+      visitors: 0,
+      uniqueVisitors: 0,
+      loggedInUsers: 0,
+      guestUsers: 0,
+      pageViews: 0,
+      searches: 0,
+      productsViewed: 0,
+      addedToCart: 0,
+      orders: 0,
+      revenue: 0
+    });
+
+    // Get top searches
+    const topSearches = await SearchAnalytics.aggregate([
+      { $match: { timestamp: { $gte: start, $lte: end } } },
+      { $group: { _id: '$query', count: { $sum: 1 }, clicked: { $sum: { $cond: ['$clicked', 1, 0] } } } },
+      { $sort: { count: -1 } },
+      { $limit: 10 },
+      { $project: { query: '$_id', count: 1, clicked: 1, _id: 0 } }
+    ]);
+
+    // Get top viewed products
+    const topProducts = await UserActivity.aggregate([
+      { $match: { lastActivity: { $gte: start, $lte: end } } },
+      { $unwind: '$activities' },
+      { $match: { 'activities.type': 'product_view', 'activities.productId': { $exists: true } } },
+      { $group: { _id: '$activities.productId', views: { $sum: 1 } } },
+      { $sort: { views: -1 } },
+      { $limit: 10 }
+    ]);
+
+    // Populate product details
+    const topProductsWithDetails = await Product.populate(topProducts, { path: '_id' });
+
+    // Get device breakdown
+    const deviceStats = dailyStats.reduce((acc, day) => ({
+      mobile: acc.mobile + day.devices.mobile,
+      tablet: acc.tablet + day.devices.tablet,
+      desktop: acc.desktop + day.devices.desktop
+    }), { mobile: 0, tablet: 0, desktop: 0 });
+
+    // Get recent activities
+    const recentActivities = await UserActivity.find()
+      .sort({ lastActivity: -1 })
+      .limit(20)
+      .populate('userId', 'name email')
+      .select('sessionId userId isLoggedIn activities lastActivity device browser');
+
+    // Get conversion rate
+    const conversionRate = totals.visitors > 0 ? ((totals.orders / totals.visitors) * 100).toFixed(2) : 0;
+
+    res.json({
+      success: true,
+      data: {
+        totals,
+        dailyStats,
+        topSearches,
+        topProducts: topProductsWithDetails.map(p => ({
+          product: p._id,
+          views: p.views
+        })),
+        deviceStats,
+        recentActivities,
+        conversionRate,
+        dateRange: { start, end }
+      }
+    });
+  } catch (error) {
+    console.error('Get analytics error:', error);
+    res.status(500).json({ success: false, message: 'Failed to fetch analytics' });
+  }
+};
+
+// Get user journey
+export const getUserJourney = async (req, res) => {
+  try {
+    const { sessionId } = req.params;
+
+    const activity = await UserActivity.findOne({ sessionId })
+      .populate('userId', 'name email')
+      .populate('activities.productId', 'name price images');
+
+    if (!activity) {
+      return res.status(404).json({ success: false, message: 'Session not found' });
+    }
+
+    res.json({ success: true, data: activity });
+  } catch (error) {
+    console.error('Get user journey error:', error);
+    res.status(500).json({ success: false, message: 'Failed to fetch user journey' });
+  }
+};
+
+// Helper functions
+function getDeviceType(userAgent) {
+  if (/mobile/i.test(userAgent)) return 'mobile';
+  if (/tablet|ipad/i.test(userAgent)) return 'tablet';
+  return 'desktop';
+}
+
+function getBrowser(userAgent) {
+  if (/chrome/i.test(userAgent)) return 'Chrome';
+  if (/firefox/i.test(userAgent)) return 'Firefox';
+  if (/safari/i.test(userAgent)) return 'Safari';
+  if (/edge/i.test(userAgent)) return 'Edge';
+  if (/opera/i.test(userAgent)) return 'Opera';
+  return 'Other';
+}
+
+function getOS(userAgent) {
+  if (/windows/i.test(userAgent)) return 'Windows';
+  if (/mac/i.test(userAgent)) return 'MacOS';
+  if (/linux/i.test(userAgent)) return 'Linux';
+  if (/android/i.test(userAgent)) return 'Android';
+  if (/ios|iphone|ipad/i.test(userAgent)) return 'iOS';
+  return 'Other';
+}
+
+async function updateDailyAnalytics(type, data) {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  let dailyAnalytics = await DailyAnalytics.findOne({ date: today });
+
+  if (!dailyAnalytics) {
+    dailyAnalytics = new DailyAnalytics({ date: today });
+  }
+
+  // Update visitors
+  if (type === 'page_view') {
+    dailyAnalytics.visitors.total++;
+    dailyAnalytics.pageViews++;
     
-    const startDate = new Date();
-    startDate.setDate(startDate.getDate() - parseInt(period));
-
-    // Total revenue
-    const totalRevenue = await Order.aggregate([
-      {
-        $match: {
-          createdAt: { $gte: startDate },
-          isPaid: true
-        }
-      },
-      {
-        $group: {
-          _id: null,
-          total: { $sum: '$totalPrice' }
-        }
-      }
-    ]);
-
-    // Total orders
-    const totalOrders = await Order.countDocuments({
-      createdAt: { $gte: startDate }
-    });
-
-    // Total customers
-    const totalCustomers = await User.countDocuments({
-      createdAt: { $gte: startDate }
-    });
-
-    // Total products
-    const totalProducts = await Product.countDocuments();
-
-    // Recent orders
-    const recentOrders = await Order.find({ createdAt: { $gte: startDate } })
-      .populate('user', 'name email')
-      .sort({ createdAt: -1 })
-      .limit(5);
-
-    // Top selling products
-    const topProducts = await Order.aggregate([
-      {
-        $match: {
-          createdAt: { $gte: startDate },
-          isPaid: true
-        }
-      },
-      { $unwind: '$orderItems' },
-      {
-        $group: {
-          _id: '$orderItems.product',
-          totalSold: { $sum: '$orderItems.quantity' },
-          revenue: { $sum: { $multiply: ['$orderItems.price', '$orderItems.quantity'] } }
-        }
-      },
-      { $sort: { totalSold: -1 } },
-      { $limit: 5 },
-      {
-        $lookup: {
-          from: 'products',
-          localField: '_id',
-          foreignField: '_id',
-          as: 'product'
-        }
-      }
-    ]);
-
-    // Sales over time (last 7 days)
-    const salesOverTime = await Order.aggregate([
-      {
-        $match: {
-          createdAt: { $gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) },
-          isPaid: true
-        }
-      },
-      {
-        $group: {
-          _id: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } },
-          revenue: { $sum: '$totalPrice' },
-          orders: { $sum: 1 }
-        }
-      },
-      { $sort: { _id: 1 } }
-    ]);
-
-    res.json({
-      totalRevenue: totalRevenue[0]?.total || 0,
-      totalOrders,
-      totalCustomers,
-      totalProducts,
-      recentOrders,
-      topProducts,
-      salesOverTime
-    });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-};
-
-// @desc    Get sales analytics
-// @route   GET /api/analytics/sales
-// @access  Private/Admin
-exports.getSalesAnalytics = async (req, res) => {
-  try {
-    const { startDate, endDate, groupBy = 'day' } = req.query;
-
-    const matchStage = {};
-    if (startDate || endDate) {
-      matchStage.createdAt = {};
-      if (startDate) matchStage.createdAt.$gte = new Date(startDate);
-      if (endDate) matchStage.createdAt.$lte = new Date(endDate);
+    if (data.isLoggedIn) {
+      dailyAnalytics.visitors.loggedIn++;
+    } else {
+      dailyAnalytics.visitors.guest++;
     }
 
-    let groupStage;
-    switch (groupBy) {
-      case 'hour':
-        groupStage = {
-          $group: {
-            _id: { $dateToString: { format: '%Y-%m-%d %H:00', date: '$createdAt' } },
-            revenue: { $sum: '$totalPrice' },
-            orders: { $sum: 1 }
-          }
-        };
-        break;
-      case 'week':
-        groupStage = {
-          $group: {
-            _id: { $week: '$createdAt' },
-            revenue: { $sum: '$totalPrice' },
-            orders: { $sum: 1 }
-          }
-        };
-        break;
-      case 'month':
-        groupStage = {
-          $group: {
-            _id: { $dateToString: { format: '%Y-%m', date: '$createdAt' } },
-            revenue: { $sum: '$totalPrice' },
-            orders: { $sum: 1 }
-          }
-        };
-        break;
-      default: // day
-        groupStage = {
-          $group: {
-            _id: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } },
-            revenue: { $sum: '$totalPrice' },
-            orders: { $sum: 1 }
-          }
-        };
+    // Update device stats
+    if (data.device === 'mobile') dailyAnalytics.devices.mobile++;
+    if (data.device === 'tablet') dailyAnalytics.devices.tablet++;
+    if (data.device === 'desktop') dailyAnalytics.devices.desktop++;
+
+    // Update browser stats
+    if (!dailyAnalytics.browsers) dailyAnalytics.browsers = {};
+    dailyAnalytics.browsers[data.browser] = (dailyAnalytics.browsers[data.browser] || 0) + 1;
+
+    // Update top pages
+    const pageIndex = dailyAnalytics.topPages.findIndex(p => p.page === data.page);
+    if (pageIndex >= 0) {
+      dailyAnalytics.topPages[pageIndex].views++;
+    } else {
+      dailyAnalytics.topPages.push({ page: data.page, views: 1 });
     }
-
-    const salesData = await Order.aggregate([
-      { $match: matchStage },
-      groupStage,
-      { $sort: { _id: 1 } }
-    ]);
-
-    res.json(salesData);
-  } catch (error) {
-    res.status(500).json({ message: error.message });
+    dailyAnalytics.topPages.sort((a, b) => b.views - a.views);
+    dailyAnalytics.topPages = dailyAnalytics.topPages.slice(0, 10);
   }
-};
 
-// @desc    Get product analytics
-// @route   GET /api/analytics/products
-// @access  Private/Admin
-exports.getProductAnalytics = async (req, res) => {
-  try {
-    // Top selling products
-    const topSelling = await Order.aggregate([
-      { $unwind: '$orderItems' },
-      {
-        $group: {
-          _id: '$orderItems.product',
-          totalSold: { $sum: '$orderItems.quantity' },
-          revenue: { $sum: { $multiply: ['$orderItems.price', '$orderItems.quantity'] } }
-        }
-      },
-      { $sort: { totalSold: -1 } },
-      { $limit: 10 },
-      {
-        $lookup: {
-          from: 'products',
-          localField: '_id',
-          foreignField: '_id',
-          as: 'product'
-        }
-      }
-    ]);
-
-    // Low stock products
-    const lowStock = await Product.find({ stock: { $lt: 10 } })
-      .select('name stock category')
-      .sort({ stock: 1 });
-
-    // Products by category
-    const categoryStats = await Product.aggregate([
-      {
-        $group: {
-          _id: '$category',
-          count: { $sum: 1 },
-          totalStock: { $sum: '$stock' },
-          avgPrice: { $avg: '$price' }
-        }
-      }
-    ]);
-
-    res.json({
-      topSelling,
-      lowStock,
-      categoryStats
-    });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
+  // Update search stats
+  if (type === 'search' && data.searchQuery) {
+    dailyAnalytics.searches.total++;
+    
+    const queryIndex = dailyAnalytics.searches.topQueries.findIndex(q => q.query === data.searchQuery);
+    if (queryIndex >= 0) {
+      dailyAnalytics.searches.topQueries[queryIndex].count++;
+    } else {
+      dailyAnalytics.searches.topQueries.push({ query: data.searchQuery, count: 1 });
+    }
+    dailyAnalytics.searches.topQueries.sort((a, b) => b.count - a.count);
+    dailyAnalytics.searches.topQueries = dailyAnalytics.searches.topQueries.slice(0, 10);
   }
-};
 
-// @desc    Get customer analytics
-// @route   GET /api/analytics/customers
-// @access  Private/Admin
-exports.getCustomerAnalytics = async (req, res) => {
-  try {
-    // New customers over time
-    const newCustomers = await User.aggregate([
-      {
-        $group: {
-          _id: { $dateToString: { format: '%Y-%m', date: '$createdAt' } },
-          count: { $sum: 1 }
-        }
-      },
-      { $sort: { _id: 1 } }
-    ]);
-
-    // Customer demographics
-    const totalCustomers = await User.countDocuments();
-    const activeCustomers = await User.countDocuments({ isActive: true });
-    const customersWithOrders = await Order.distinct('user');
-
-    // Top customers by spending
-    const topCustomers = await Order.aggregate([
-      {
-        $group: {
-          _id: '$user',
-          totalSpent: { $sum: '$totalPrice' },
-          orderCount: { $sum: 1 }
-        }
-      },
-      { $sort: { totalSpent: -1 } },
-      { $limit: 10 },
-      {
-        $lookup: {
-          from: 'users',
-          localField: '_id',
-          foreignField: '_id',
-          as: 'customer'
-        }
-      }
-    ]);
-
-    res.json({
-      totalCustomers,
-      activeCustomers,
-      customersWithOrders: customersWithOrders.length,
-      newCustomers,
-      topCustomers
-    });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
+  // Update product stats
+  if (type === 'product_view') {
+    dailyAnalytics.products.viewed++;
   }
-};
-
-// @desc    Get inventory analytics
-// @route   GET /api/analytics/inventory
-// @access  Private/Admin
-exports.getInventoryAnalytics = async (req, res) => {
-  try {
-    // Total inventory value
-    const inventoryValue = await Product.aggregate([
-      {
-        $group: {
-          _id: null,
-          totalValue: { $sum: { $multiply: ['$price', '$stock'] } },
-          totalProducts: { $sum: 1 },
-          totalStock: { $sum: '$stock' }
-        }
-      }
-    ]);
-
-    // Stock status
-    const inStock = await Product.countDocuments({ stock: { $gt: 0 } });
-    const outOfStock = await Product.countDocuments({ stock: 0 });
-    const lowStock = await Product.countDocuments({ stock: { $gt: 0, $lt: 10 } });
-
-    // Category inventory
-    const categoryInventory = await Product.aggregate([
-      {
-        $group: {
-          _id: '$category',
-          totalValue: { $sum: { $multiply: ['$price', '$stock'] } },
-          totalStock: { $sum: '$stock' },
-          productCount: { $sum: 1 }
-        }
-      }
-    ]);
-
-    res.json({
-      totalValue: inventoryValue[0]?.totalValue || 0,
-      totalProducts: inventoryValue[0]?.totalProducts || 0,
-      totalStock: inventoryValue[0]?.totalStock || 0,
-      inStock,
-      outOfStock,
-      lowStock,
-      categoryInventory
-    });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
+  if (type === 'add_to_cart') {
+    dailyAnalytics.products.addedToCart++;
   }
-};
+
+  await dailyAnalytics.save();
+}
