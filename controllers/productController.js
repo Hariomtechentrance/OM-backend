@@ -1,9 +1,53 @@
+import fs from "fs";
 import mongoose from "mongoose";
 import Product from "../models/Product.js";
 import Category from "../models/Category.js";
 import Collection from "../models/Collection.js";
 import { getSiteSettingsDoc } from "../utils/siteSettings.js";
 import { enrichProductForStorefront } from "../utils/discountPricing.js";
+
+// ── CSV helpers ───────────────────────────────────────────────────────────────
+
+function parseCSVLine(line) {
+  const result = [];
+  let current = "";
+  let inQuotes = false;
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (ch === '"') {
+      if (inQuotes && line[i + 1] === '"') { current += '"'; i++; }
+      else inQuotes = !inQuotes;
+    } else if (ch === "," && !inQuotes) {
+      result.push(current);
+      current = "";
+    } else {
+      current += ch;
+    }
+  }
+  result.push(current);
+  return result;
+}
+
+function parseCSV(text) {
+  const lines = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n")
+    .split("\n").filter(l => l.trim());
+  if (lines.length < 2) return [];
+  const headers = parseCSVLine(lines[0]).map(h => h.trim());
+  return lines.slice(1).map(line => {
+    const vals = parseCSVLine(line);
+    const row = {};
+    headers.forEach((h, i) => { row[h] = (vals[i] || "").trim(); });
+    return row;
+  }).filter(row => Object.values(row).some(v => v));
+}
+
+const splitTrim = (str) => (str || "").split(",").map(s => s.trim()).filter(Boolean);
+
+const parseSizes = (str) =>
+  splitTrim(str).map(s => {
+    const [size, stock] = s.split(":");
+    return { size: size?.trim(), stock: parseInt(stock?.trim()) || 0 };
+  }).filter(s => s.size);
 
 function escapeRegex(s) {
   return String(s).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -458,4 +502,118 @@ export const deleteProduct = async (req, res) => {
     });
 
   }
+};
+
+/*
+---------------------------------------------------------
+POST /api/products/admin/bulk-upload
+Admin: bulk create products from CSV
+---------------------------------------------------------
+*/
+export const bulkUploadProducts = async (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ success: false, message: "CSV file is required" });
+  }
+
+  let csvText;
+  try {
+    csvText = fs.readFileSync(req.file.path, "utf-8");
+  } finally {
+    try { fs.unlinkSync(req.file.path); } catch {}
+  }
+
+  const rows = parseCSV(csvText);
+  if (!rows.length) {
+    return res.status(400).json({ success: false, message: "CSV is empty or has no data rows" });
+  }
+
+  const results = { total: rows.length, created: 0, failed: 0, errors: [] };
+
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i];
+    try {
+      // Resolve category by name
+      let categoryId = null;
+      if (row.categoryName) {
+        const cat = await Category.findOne({
+          $or: [
+            { name: new RegExp(`^${escapeRegex(row.categoryName)}$`, "i") },
+            { slug: row.categoryName.toLowerCase() }
+          ]
+        });
+        if (cat) categoryId = cat._id;
+      }
+
+      // Resolve collection by name
+      let collectionId = null;
+      if (row.collectionName) {
+        const col = await Collection.findOne({
+          $or: [
+            { name: new RegExp(`^${escapeRegex(row.collectionName)}$`, "i") },
+            { slug: row.collectionName.toLowerCase() }
+          ]
+        });
+        if (col) collectionId = col._id;
+      }
+      collectionId = collectionId || categoryId;
+
+      const sizes = parseSizes(row.sizes);
+      const colors = splitTrim(row.colors);
+      const tags = splitTrim(row.tags);
+      const images = splitTrim(row.imageUrls).map(url => ({ url, public_id: "" }));
+      const totalStock = sizes.reduce((sum, s) => sum + (s.stock || 0), 0);
+
+      const discountPercent = Math.min(100, Math.max(0, parseFloat(row.discountPercent) || 0));
+
+      await Product.create({
+        name: row.name,
+        skuCode: row.skuCode,
+        h1Heading: row.h1Heading,
+        price: parseFloat(row.price) || 0,
+        category: categoryId,
+        collection: collectionId,
+        brand: row.brand || "Black Locust",
+        description: row.description || "",
+        specifications: row.specifications || "",
+        availability: ["in_stock", "out_of_stock", "limited"].includes(row.availability)
+          ? row.availability : "in_stock",
+        sizes,
+        colors,
+        images,
+        isFeatured: row.isFeatured === "true",
+        isNewArrival: row.isNewArrival === "true",
+        isTrending: row.isTrending === "true",
+        discountMode: row.discountMode === "custom" ? "custom" : "inherit",
+        discountPercent,
+        tags,
+        material: row.material || "",
+        careInstructions: row.careInstructions || "",
+        productLink: row.productLink || "",
+        totalStock,
+        productSpecs: {
+          fit: ["Regular Fit", "Tailored Fit", "Slim Fit", "Relaxed Fit"].includes(row.fit)
+            ? row.fit : "Regular Fit",
+          marketingDescription: row.marketingDescription || row.description || "",
+          technicalSpecs: {
+            fabric: row.fabric || "",
+            sleeves: row.sleeves || "",
+            collar: row.collar || "",
+            pocket: row.pocket || "",
+            occasion: row.occasion || ""
+          }
+        }
+      });
+
+      results.created++;
+    } catch (err) {
+      results.failed++;
+      results.errors.push({
+        row: i + 2,
+        name: row.name || `Row ${i + 2}`,
+        error: err.message
+      });
+    }
+  }
+
+  res.json({ success: true, results });
 };

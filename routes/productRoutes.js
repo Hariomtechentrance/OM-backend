@@ -9,7 +9,8 @@ import {
   updateProduct,
   deleteProduct,
   toggleProductStatus,
-  syncAllProductsDiscountInherit
+  syncAllProductsDiscountInherit,
+  bulkUploadProducts
 } from "../controllers/productController.js";
 import {
   getProductReviews,
@@ -22,6 +23,7 @@ import { protect, authorize } from "../middleware/auth.js";
 const upload = multer({ dest: "uploads/" });
 
 // Static paths must be registered before /:id
+router.post("/admin/bulk-upload", upload.single("csvFile"), bulkUploadProducts);
 router.post("/", upload.array("images"), createProduct);
 router.post(
   "/admin/sync-discount-inherit",
