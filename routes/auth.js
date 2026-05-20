@@ -544,6 +544,7 @@ router.post('/verify-email', async (req, res) => {
 
 import OTP from '../models/OTP.js';
 import { sendOTPEmail } from '../services/emailService.js';
+import { sendOTPSMS } from '../services/smsService.js';
 
 // Generate 6-digit OTP
 const generateOTP = () => {
@@ -704,60 +705,53 @@ router.post('/facebook', async (req, res) => {
 
 /**
  * @route   POST /api/auth/send-otp
- * @desc    Send OTP to email
+ * @desc    Send OTP to email or phone
  * @access  Public
  */
 router.post('/send-otp', async (req, res) => {
   try {
-    const { email } = req.body;
+    const { email, phone } = req.body;
+    const isMobile = Boolean(phone);
+    const identifier = isMobile ? phone : email;
 
-    if (!email) {
-      return res.status(400).json({
-        success: false,
-        error: 'Email is required'
-      });
+    if (!identifier) {
+      return res.status(400).json({ success: false, error: 'Email or phone is required' });
     }
 
-    // Validate email format
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-      return res.status(400).json({
-        success: false,
-        error: 'Invalid email format'
-      });
+    if (isMobile) {
+      const phoneRegex = /^[6-9]\d{9}$/;
+      if (!phoneRegex.test(phone)) {
+        return res.status(400).json({ success: false, error: 'Enter a valid 10-digit Indian mobile number' });
+      }
+    } else {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email)) {
+        return res.status(400).json({ success: false, error: 'Invalid email format' });
+      }
     }
 
-    // Generate OTP
     const otp = generateOTP();
-    const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
 
-    // Delete any existing OTPs for this email
-    await OTP.deleteMany({ identifier: email });
+    await OTP.deleteMany({ identifier });
+    await OTP.create({ identifier, otp, expiresAt, verified: false, attempts: 0 });
 
-    // Save OTP to database
-    await OTP.create({
-      identifier: email,
-      otp,
-      expiresAt,
-      verified: false,
-      attempts: 0
-    });
-
-    // Send OTP via email
     try {
-      await sendOTPEmail(email, otp);
-      
-      res.status(200).json({
-        success: true,
-        message: 'OTP sent to your email',
-        demo: false
-      });
-    } catch (emailError) {
-      console.error('Email sending error:', emailError);
-      
-      // If email fails, still return success but in demo mode
-      console.log(`Demo Mode - OTP for ${email}: ${otp}`);
-      
+      if (isMobile) {
+        const result = await sendOTPSMS(phone, otp);
+        res.status(200).json({
+          success: true,
+          message: result.demo ? 'OTP generated (Demo Mode - check console)' : `OTP sent to +91 ${phone}`,
+          demo: result.demo,
+          otp: result.demo && process.env.NODE_ENV === 'development' ? otp : undefined
+        });
+      } else {
+        await sendOTPEmail(email, otp);
+        res.status(200).json({ success: true, message: 'OTP sent to your email', demo: false });
+      }
+    } catch (deliveryError) {
+      console.error('OTP delivery error:', deliveryError);
+      console.log(`Demo Mode - OTP for ${identifier}: ${otp}`);
       res.status(200).json({
         success: true,
         message: 'OTP generated (Demo Mode - check console)',
@@ -767,66 +761,44 @@ router.post('/send-otp', async (req, res) => {
     }
   } catch (error) {
     console.error('Send OTP error:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Failed to send OTP',
-      message: error.message
-    });
+    res.status(500).json({ success: false, error: 'Failed to send OTP', message: error.message });
   }
 });
 
 /**
  * @route   POST /api/auth/verify-otp
- * @desc    Verify OTP and login/register user
+ * @desc    Verify OTP and login/register user (email or phone)
  * @access  Public
  */
 router.post('/verify-otp', async (req, res) => {
   try {
-    const { email, otp } = req.body;
+    const { email, phone, otp } = req.body;
+    const isMobile = Boolean(phone);
+    const identifier = isMobile ? phone : email;
 
-    if (!email || !otp) {
-      return res.status(400).json({
-        success: false,
-        error: 'Email and OTP are required'
-      });
+    if (!identifier || !otp) {
+      return res.status(400).json({ success: false, error: 'Identifier (email or phone) and OTP are required' });
     }
 
-    // Find OTP record
-    const otpRecord = await OTP.findOne({
-      identifier: email,
-      verified: false
-    }).sort({ createdAt: -1 });
+    const otpRecord = await OTP.findOne({ identifier, verified: false }).sort({ createdAt: -1 });
 
     if (!otpRecord) {
-      return res.status(400).json({
-        success: false,
-        error: 'OTP not found or already used'
-      });
+      return res.status(400).json({ success: false, error: 'OTP not found or already used' });
     }
 
-    // Check if OTP is expired
     if (new Date() > otpRecord.expiresAt) {
       await OTP.deleteOne({ _id: otpRecord._id });
-      return res.status(400).json({
-        success: false,
-        error: 'OTP has expired'
-      });
+      return res.status(400).json({ success: false, error: 'OTP has expired' });
     }
 
-    // Check attempts
     if (otpRecord.attempts >= 5) {
       await OTP.deleteOne({ _id: otpRecord._id });
-      return res.status(400).json({
-        success: false,
-        error: 'Too many failed attempts'
-      });
+      return res.status(400).json({ success: false, error: 'Too many failed attempts' });
     }
 
-    // Verify OTP
     if (otpRecord.otp !== otp) {
       otpRecord.attempts += 1;
       await otpRecord.save();
-      
       return res.status(400).json({
         success: false,
         error: 'Invalid OTP',
@@ -834,40 +806,46 @@ router.post('/verify-otp', async (req, res) => {
       });
     }
 
-    // Mark OTP as verified
     otpRecord.verified = true;
     await otpRecord.save();
 
-    // Check if user exists
-    let user = await User.findOne({ email });
-
-    if (!user) {
-      // Create new user
-      user = await User.create({
-        name: email.split('@')[0],
-        email,
-        authMethod: 'otp',
-        emailVerified: true,
-        isEmailVerified: true,
-        role: 'user'
-      });
+    let user;
+    if (isMobile) {
+      user = await User.findOne({ phone });
+      if (!user) {
+        user = await User.create({
+          name: `User${phone.slice(-4)}`,
+          phone,
+          authMethod: 'otp',
+          phoneVerified: true,
+          role: 'user'
+        });
+      } else {
+        user.phoneVerified = true;
+        await user.save();
+      }
     } else {
-      // Update existing user
-      user.emailVerified = true;
-      user.isEmailVerified = true;
-      await user.save();
+      user = await User.findOne({ email });
+      if (!user) {
+        user = await User.create({
+          name: email.split('@')[0],
+          email,
+          authMethod: 'otp',
+          emailVerified: true,
+          isEmailVerified: true,
+          role: 'user'
+        });
+      } else {
+        user.emailVerified = true;
+        user.isEmailVerified = true;
+        await user.save();
+      }
     }
 
-    // Generate token
-    const token = generateToken({ 
-      userId: user._id, 
-      email: user.email,
-      role: user.role 
-    });
+    const token = generateToken({ userId: user._id, email: user.email, role: user.role });
     const refreshToken = generateSecureToken();
     const tokenExpiry = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
 
-    // Delete OTP record
     await OTP.deleteOne({ _id: otpRecord._id });
 
     res.status(200).json({
@@ -879,18 +857,96 @@ router.post('/verify-otp', async (req, res) => {
       user: {
         id: user._id,
         name: user.name,
-        email: user.email,
+        email: user.email || null,
+        phone: user.phone || null,
         role: user.role,
         authMethod: user.authMethod
       }
     });
   } catch (error) {
     console.error('Verify OTP error:', error);
-    res.status(500).json({
-      success: false,
-      error: 'OTP verification failed',
-      message: error.message
+    res.status(500).json({ success: false, error: 'OTP verification failed', message: error.message });
+  }
+});
+
+/**
+ * @route   POST /api/auth/phone-otp-login
+ * @desc    Login/register after Firebase Phone OTP verification
+ * @access  Public
+ */
+router.post('/phone-otp-login', async (req, res) => {
+  try {
+    const { idToken, phone } = req.body;
+
+    if (!idToken) {
+      return res.status(400).json({ success: false, error: 'Firebase ID token is required' });
+    }
+
+    // Verify the Firebase ID token using Google Identity Toolkit REST API
+    const apiKey = process.env.FIREBASE_WEB_API_KEY;
+    if (!apiKey) {
+      return res.status(500).json({ success: false, error: 'Firebase Web API key not configured on server' });
+    }
+
+    const verifyRes = await fetch(
+      `https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ idToken })
+      }
+    );
+
+    const verifyData = await verifyRes.json();
+
+    if (verifyData.error || !verifyData.users?.[0]) {
+      return res.status(401).json({ success: false, error: 'Invalid or expired Firebase token' });
+    }
+
+    const fbUser = verifyData.users[0];
+    const firebasePhone = fbUser.phoneNumber; // e.g. "+919876543210"
+    const localPhone = firebasePhone.replace(/^\+91/, '');
+
+    // Find or create user
+    let user = await User.findOne({ phone: localPhone });
+
+    if (!user) {
+      user = await User.create({
+        name: `User${localPhone.slice(-4)}`,
+        phone: localPhone,
+        authMethod: 'otp',
+        phoneVerified: true,
+        role: 'user'
+      });
+    } else {
+      if (!user.phoneVerified) {
+        user.phoneVerified = true;
+        await user.save();
+      }
+    }
+
+    const token = generateToken({ userId: user._id, email: user.email, role: user.role });
+    const refreshToken = generateSecureToken();
+    const tokenExpiry = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+
+    res.status(200).json({
+      success: true,
+      message: 'Phone login successful',
+      token,
+      refreshToken,
+      tokenExpiry,
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email || null,
+        phone: user.phone,
+        role: user.role,
+        authMethod: user.authMethod
+      }
     });
+  } catch (error) {
+    console.error('Phone OTP login error:', error);
+    res.status(500).json({ success: false, error: 'Phone login failed', message: error.message });
   }
 });
 
