@@ -559,11 +559,32 @@ export const bulkUploadProducts = async (req, res) => {
 
       const sizes = parseSizes(row.sizes);
       const colors = splitTrim(row.colors);
-      const tags = splitTrim(row.tags);
       const images = splitTrim(row.imageUrls).map(url => ({ url, public_id: "" }));
       const totalStock = sizes.reduce((sum, s) => sum + (s.stock || 0), 0);
-
       const discountPercent = Math.min(100, Math.max(0, parseFloat(row.discountPercent) || 0));
+
+      // Merge explicit tags with category-identity fields so products are searchable/filterable
+      const extraTags = [row.gender, row.subcategory, row.ageGroup, row.season,
+                         row.closure, row.rise, row.legStyle, row.lining, row.hood]
+        .filter(Boolean)
+        .map(t => t.trim())
+        .filter(t => t && t.toLowerCase() !== 'no');
+      const tags = [...new Set([...splitTrim(row.tags), ...extraTags])];
+
+      // Build a specifications string that includes category-specific details
+      const specsLines = [row.specifications];
+      if (row.gender)     specsLines.push(`Gender: ${row.gender}`);
+      if (row.subcategory) specsLines.push(`Type: ${row.subcategory}`);
+      if (row.ageGroup)   specsLines.push(`Age Group: ${row.ageGroup}`);
+      if (row.season)     specsLines.push(`Season: ${row.season}`);
+      if (row.rise)       specsLines.push(`Rise: ${row.rise}`);
+      if (row.legStyle)   specsLines.push(`Leg Style: ${row.legStyle}`);
+      if (row.closure)    specsLines.push(`Closure: ${row.closure}`);
+      if (row.lining)     specsLines.push(`Lining: ${row.lining}`);
+      if (row.hood && row.hood.toLowerCase() !== 'no') specsLines.push(`Hood: ${row.hood}`);
+      const fullSpecifications = specsLines.filter(Boolean).join('\n');
+
+      const VALID_FITS = ["Regular Fit", "Tailored Fit", "Slim Fit", "Relaxed Fit"];
 
       await Product.create({
         name: row.name,
@@ -574,7 +595,7 @@ export const bulkUploadProducts = async (req, res) => {
         collection: collectionId,
         brand: row.brand || "Black Locust",
         description: row.description || "",
-        specifications: row.specifications || "",
+        specifications: fullSpecifications,
         availability: ["in_stock", "out_of_stock", "limited"].includes(row.availability)
           ? row.availability : "in_stock",
         sizes,
@@ -591,11 +612,11 @@ export const bulkUploadProducts = async (req, res) => {
         productLink: row.productLink || "",
         totalStock,
         productSpecs: {
-          fit: ["Regular Fit", "Tailored Fit", "Slim Fit", "Relaxed Fit"].includes(row.fit)
-            ? row.fit : "Regular Fit",
+          fit: VALID_FITS.includes(row.fit) ? row.fit : "Regular Fit",
           marketingDescription: row.marketingDescription || row.description || "",
           technicalSpecs: {
             fabric: row.fabric || "",
+            // For tops: sleeves + collar + pocket | For bottoms: rise + legStyle + closure | Jackets: lining/hood
             sleeves: row.sleeves || "",
             collar: row.collar || "",
             pocket: row.pocket || "",
