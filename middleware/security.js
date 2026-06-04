@@ -148,25 +148,9 @@ const helmetConfig = {
   }
 };
 
-// Input sanitization middleware
-const sanitizeInput = (req, res, next) => {
-  // Sanitize body
-  if (req.body) {
-    req.body = mongoSanitize(req.body);
-  }
-  
-  // Sanitize query parameters
-  if (req.query) {
-    req.query = mongoSanitize(req.query);
-  }
-  
-  // Sanitize URL parameters
-  if (req.params) {
-    req.params = mongoSanitize(req.params);
-  }
-  
-  next();
-};
+// Input sanitization middleware — strips MongoDB operator keys ($, .) from request data
+// express-mongo-sanitize must be used as middleware, not called as a function on objects
+const sanitizeInput = mongoSanitize({ replaceWith: '_' });
 
 // CSRF protection middleware
 const csrfProtection = (req, res, next) => {
@@ -306,8 +290,8 @@ const setupSecurity = (app) => {
   // Rate limiting is handled by server.js (kept centralized to avoid double throttling).
   // app.use('/api/', securityConfig.generalLimiter);
   
-  // Data sanitization
-  // app.use(sanitizeInput); // Temporarily disabled for debugging
+  // Data sanitization against NoSQL injection (e.g. { $gt: "" } in body)
+  app.use(sanitizeInput);
   
   // Prevent parameter pollution
   app.use(hpp());

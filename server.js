@@ -1,6 +1,7 @@
 import express from 'express';
 import mongoose from 'mongoose';
 import cors from 'cors';
+import cookieParser from 'cookie-parser';
 import compression from 'compression';
 import morgan from 'morgan';
 import rateLimit from 'express-rate-limit';
@@ -48,24 +49,26 @@ if (process.env.FRONTEND_URL) {
     if (!allowedOrigins.includes(u)) allowedOrigins.push(u);
   });
 
+const isProduction = process.env.NODE_ENV === 'production';
+
 app.use(cors({
   origin: function (origin, callback) {
-    // Allow requests with no origin (mobile apps, curl, Postman)
+    // Allow requests with no origin (native mobile apps, server-to-server)
     if (!origin) return callback(null, true);
+
     if (allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      console.log("❌ Blocked by CORS:", origin);
-      // For images, allow all origins as fallback
-      if (origin && (origin.includes('localhost') || origin.includes('127.0.0.1'))) {
-        callback(null, true);
-      } else {
-        callback(new Error("Not allowed by CORS"));
-      }
+      return callback(null, true);
     }
+
+    // Allow any localhost origin only in development
+    if (!isProduction && (origin.includes('localhost') || origin.includes('127.0.0.1'))) {
+      return callback(null, true);
+    }
+
+    callback(new Error("Not allowed by CORS"));
   },
   credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
   exposedHeaders: ['Content-Range', 'X-Content-Range']
 }));
@@ -73,8 +76,9 @@ app.use(cors({
 // Additional middleware
 app.use(compression());
 app.use(morgan('dev'));
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(cookieParser());
+app.use(express.json({ limit: '2mb' }));
+app.use(express.urlencoded({ extended: true, limit: '2mb' }));
 
 // Trust proxy for Render / PM2 environments
 app.set('trust proxy', 1);
@@ -82,14 +86,29 @@ app.set('trust proxy', 1);
 // Security hardening (after body parsers)
 setupSecurity(app);
 
-// ✅ Rate limiting - increased to handle mobile users on shared IPs
+// General API rate limit
 const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
+  windowMs: 15 * 60 * 1000,
   max: 500,
   standardHeaders: true,
   legacyHeaders: false,
+  message: { success: false, message: 'Too many requests, please try again later.' }
 });
 app.use('/api/', limiter);
+
+// Strict rate limit for login/register/OTP — 20 attempts per 15 min per IP
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { success: false, message: 'Too many auth attempts, please try again in 15 minutes.' }
+});
+app.use('/api/auth/login', authLimiter);
+app.use('/api/auth/register', authLimiter);
+app.use('/api/auth/send-otp', authLimiter);
+app.use('/api/auth/forgot-password', authLimiter);
+app.use('/api/auth/admin/login', authLimiter);
 
 // ✅ All routes registered BEFORE start() is called
 app.use('/api/settings', siteSettingsRoutes);

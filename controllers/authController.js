@@ -6,9 +6,11 @@ import { sendOTPEmail } from '../services/emailService.js';
 
 // Generate JWT token
 const generateToken = (userId, email, role) => {
+  const secret = process.env.JWT_SECRET;
+  if (!secret) throw new Error('JWT_SECRET environment variable is not set');
   return jwt.sign(
     { userId, email, role },
-    process.env.JWT_SECRET || 'your-secret-key',
+    secret,
     { expiresIn: '7d' }
   );
 };

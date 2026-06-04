@@ -60,17 +60,20 @@ exports.uploadImage = async (req, res) => {
   }
 };
 
-// Serve uploaded files
+// Serve uploaded files — path traversal protected
 exports.serveFile = (req, res) => {
-  const filename = req.params.filename;
-  const filePath = path.join(__dirname, '../uploads/categories', filename);
-  
+  const filename = path.basename(req.params.filename); // strips any ../ sequences
+  const uploadDir = path.resolve(__dirname, '../uploads/categories');
+  const filePath = path.join(uploadDir, filename);
+
+  // Ensure resolved path stays inside the intended directory
+  if (!filePath.startsWith(uploadDir + path.sep)) {
+    return res.status(400).json({ success: false, message: 'Invalid filename' });
+  }
+
   if (fs.existsSync(filePath)) {
     res.sendFile(filePath);
   } else {
-    res.status(404).json({
-      success: false,
-      message: 'File not found'
-    });
+    res.status(404).json({ success: false, message: 'File not found' });
   }
 };

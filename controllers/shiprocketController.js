@@ -58,16 +58,16 @@ export const createShipment = async (req, res) => {
     }
 
     // Update order with shipment details
+    // shipmentResult exposes top-level fields AND a .data sub-object (for real API vs mock)
     order.shiprocket = {
-      orderId: shipmentResult.data?.shipment_id || '',
-      shipmentId: shipmentResult.data?.shipment_id || '',
-      awbNumber: shipmentResult.data?.awb_code || '',
-      courierName: shipmentResult.data?.courier_name || '',
-      trackingUrl: shipmentResult.data?.tracking_url || '',
+      orderId: shipmentResult.shipmentId || shipmentResult.data?.shipment_id || '',
+      shipmentId: shipmentResult.shipmentId || shipmentResult.data?.shipment_id || '',
+      awbNumber: shipmentResult.awbNumber || shipmentResult.data?.awb_code || '',
+      courierName: shipmentResult.courierName || shipmentResult.data?.courier_name || '',
+      trackingUrl: shipmentResult.trackingUrl || shipmentResult.data?.tracking_url || '',
       raw: shipmentResult.data
     };
 
-    // Update order status to shipped
     order.status = 'shipped';
     order.shippedAt = new Date();
 
@@ -226,6 +226,8 @@ export const getAvailableCouriers = async (req, res) => {
   }
 };
 
+// NOTE: functions below (shiprocketLogin, createAdhocShipment, assignAwb, createShiprocketShipment)
+// are superseded by ShiprocketService class above. Kept here only until routes are migrated.
 async function shiprocketLogin() {
   const email = requireEnv('SHIPROCKET_EMAIL');
   const password = requireEnv('SHIPROCKET_PASSWORD');

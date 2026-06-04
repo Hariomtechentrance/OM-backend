@@ -3,6 +3,7 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
 import User from '../models/userModel.js';
+import { setAuthCookie, clearAuthCookie } from '../utils/cookieAuth.js';
 import { 
   validatePassword, 
   hashPassword, 
@@ -63,22 +64,18 @@ const send2FACode = async (email, code) => {
 // Register new user
 router.post('/register', async (req, res) => {
   try {
-    console.log('Registration request body:', req.body);
     const { name, email, password, phone } = req.body;
 
-    // Validate input
-    if (!name || !email || !password) {
-      console.log('Validation failed: missing fields');
-      return res.status(400).json({ 
-        error: 'Name, email, and password are required' 
-      });
+    // Validate input — enforce string types to prevent object injection after sanitisation
+    if (!name || !email || !password ||
+        typeof name !== 'string' || typeof email !== 'string' || typeof password !== 'string') {
+      return res.status(400).json({ error: 'Name, email, and password are required' });
     }
 
     // Validate email format
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
-      console.log('Validation failed: invalid email format');
-      return res.status(400).json({ 
+            return res.status(400).json({ 
         error: 'Invalid email format' 
       });
     }
@@ -86,7 +83,6 @@ router.post('/register', async (req, res) => {
     // Validate password
     const passwordValidation = validatePassword(password);
     if (!passwordValidation.isValid) {
-      console.log('Validation failed: password requirements', passwordValidation.errors);
       return res.status(400).json({ 
         error: 'Password does not meet security requirements',
         details: passwordValidation.errors
@@ -94,31 +90,12 @@ router.post('/register', async (req, res) => {
     }
 
     // Check if user already exists
-    console.log('Checking for existing user with email:', email, 'phone:', phone);
-    const existingUser = await User.findOne({ 
-      $or: [{ email }, { phone }] 
-    });
-    
-    console.log('Existing user found:', existingUser);
-    
+    const existingUser = await User.findOne({ $or: [{ email }, { phone }] });
     if (existingUser) {
-      return res.status(409).json({ 
-        error: 'User with this email or phone already exists' 
-      });
+      return res.status(409).json({ error: 'User with this email or phone already exists' });
     }
 
-    // Hash password using the security module
-    console.log('Hashing password...');
-    // Note: The User model's pre-save hook will handle password hashing
-    // So we just pass the plain password here
-    console.log('Password validation complete');
-
-    // Generate 2FA secret
     const twoFactorSecret = generate2FASecret();
-    console.log('2FA secret generated');
-
-    // Create new user with plain password (model will hash it)
-    console.log('Creating new user...');
     const user = new User({
       name,
       email,
@@ -134,27 +111,25 @@ router.post('/register', async (req, res) => {
       accountLocked: false
     });
 
-    console.log('User object created:', user);
 
     try {
       const savedUser = await user.save();
-      console.log('User saved successfully:', savedUser);
 
       // Send verification email
       // await emailService.sendVerificationEmail(email, user.emailVerificationToken);
 
-      // Generate JWT token
-      const token = generateToken({ 
-        userId: user._id, 
+      const token = generateToken({
+        userId: user._id,
         email: user.email,
-        role: user.role 
+        role: user.role
       });
 
-      console.log('Token generated:', token);
+      // Set httpOnly cookie — JS/DevTools cannot read this
+      setAuthCookie(res, token);
 
       res.status(201).json({
         message: 'User registered successfully',
-        token,
+        token, // also returned for native/mobile clients
         user: {
           id: user._id,
           name: user.name,
@@ -189,10 +164,8 @@ router.post('/login', async (req, res) => {
   try {
     const { email, password, twoFactorCode } = req.body;
 
-    if (!email || !password) {
-      return res.status(400).json({ 
-        error: 'Email and password are required' 
-      });
+    if (!email || !password || typeof email !== 'string' || typeof password !== 'string') {
+      return res.status(400).json({ error: 'Email and password are required' });
     }
 
     // Check if account is locked
@@ -245,13 +218,18 @@ router.post('/login', async (req, res) => {
     }
 
     if (user.twoFactorEnabled && twoFactorCode) {
-      // Verify 2FA code (simplified - in production use TOTP library)
-      if (twoFactorCode !== '123456') { // Mock verification
-        return res.status(401).json({ 
-          success: false,
-          error: 'Invalid 2FA code' 
-        });
+      // Verify OTP stored in DB (sent to user's email/phone during the 2FA challenge step)
+      const otpRecord = await OTP.findOne({
+        identifier: user.email,
+        otp: twoFactorCode,
+        verified: false,
+        expiresAt: { $gt: new Date() }
+      });
+      if (!otpRecord) {
+        return res.status(401).json({ success: false, error: 'Invalid or expired 2FA code' });
       }
+      otpRecord.verified = true;
+      await otpRecord.save();
     }
 
     // Clear failed attempts on successful login
@@ -269,13 +247,15 @@ router.post('/login', async (req, res) => {
       role: user.role 
     });
 
-    // Generate refresh token
     const refreshToken = generateSecureToken();
+
+    // Set httpOnly cookie — inaccessible to JavaScript and DevTools
+    setAuthCookie(res, token);
 
     res.status(200).json({
       success: true,
       message: 'Login successful',
-      token,
+      token, // also returned for native/mobile clients
       refreshToken,
       user: {
         id: user._id,
@@ -288,10 +268,7 @@ router.post('/login', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Login error:', error);
-    res.status(500).json({ 
-      error: 'Internal server error during login' 
-    });
+    res.status(500).json({ error: 'Internal server error during login' });
   }
 });
 
@@ -315,55 +292,54 @@ router.post('/admin/login', async (req, res) => {
       });
     }
 
-    console.log("✅ Admin login successful");
+    const secret = process.env.JWT_SECRET;
+    if (!secret) return res.status(503).json({ success: false, error: 'Server not configured' });
 
     const token = jwt.sign(
       { userId: 'admin', role: 'admin' },
-      process.env.JWT_SECRET || 'fallback_secret',
+      secret,
       { expiresIn: '7d' }
     );
 
+    setAuthCookie(res, token);
+
     res.json({
       success: true,
-      message: "Admin login successful",
-      admin: {
-        email,
-        role: "admin",
-        name: "Admin User"
-      },
+      message: 'Admin login successful',
+      admin: { email, role: 'admin', name: 'Admin User' },
       token
     });
 
   } catch (error) {
-    console.error("ADMIN LOGIN ERROR:", error);
-    res.status(500).json({
-      success: false,
-      error: "Server error"
-    });
+    res.status(500).json({ success: false, error: 'Server error' });
   }
 });
 
-// Enable 2FA
+// Enable 2FA — requires a valid OTP sent to user's email
 router.post('/enable-2fa', async (req, res) => {
   try {
     const { userId, code } = req.body;
-    
-    const user = await User.findById(userId).select('+twoFactorSecret');
-    
-    if (!user) {
-      return res.status(404).json({ error: 'User not found' });
-    }
+    if (!userId || !code) return res.status(400).json({ error: 'userId and code are required' });
 
-    // Verify 2FA code (simplified)
-    if (code !== '123456') {
-      return res.status(400).json({ error: 'Invalid verification code' });
+    const user = await User.findById(userId).select('+twoFactorSecret');
+    if (!user) return res.status(404).json({ error: 'User not found' });
+
+    const otpRecord = await OTP.findOne({
+      identifier: user.email,
+      otp: code,
+      verified: false,
+      expiresAt: { $gt: new Date() }
+    });
+    if (!otpRecord) {
+      return res.status(400).json({ error: 'Invalid or expired verification code' });
     }
+    otpRecord.verified = true;
+    await otpRecord.save();
 
     user.twoFactorEnabled = true;
     await user.save();
 
     res.json({ message: '2FA enabled successfully' });
-
   } catch (error) {
     console.error('2FA enable error:', error);
     res.status(500).json({ error: 'Internal server error' });
@@ -403,20 +379,20 @@ router.post('/refresh', async (req, res) => {
   }
 });
 
-// Logout
+import { blacklistToken } from '../utils/tokenBlacklist.js';
+
+// Logout — clears httpOnly cookie AND blacklists token
 router.post('/logout', async (req, res) => {
   try {
-    const { token } = req.body;
-    
-    if (token) {
-      // Add token to blacklist (simplified - in production use Redis)
-      console.log('Token blacklisted:', token);
-    }
+    const cookieToken = req.cookies?.bl_sid;
+    const headerToken = req.headers.authorization?.startsWith('Bearer ')
+      ? req.headers.authorization.slice(7)
+      : req.body?.token;
 
+    blacklistToken(cookieToken || headerToken);
+    clearAuthCookie(res);
     res.json({ message: 'Logout successful' });
-
   } catch (error) {
-    console.error('Logout error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -741,9 +717,8 @@ router.post('/send-otp', async (req, res) => {
         const result = await sendOTPSMS(phone, otp);
         res.status(200).json({
           success: true,
-          message: result.demo ? 'OTP generated (Demo Mode - check console)' : `OTP sent to +91 ${phone}`,
-          demo: result.demo,
-          otp: result.demo && process.env.NODE_ENV === 'development' ? otp : undefined
+          message: result.demo ? 'OTP generated (check server console)' : `OTP sent to +91 ${phone}`,
+          demo: result.demo
         });
       } else {
         await sendOTPEmail(email, otp);
@@ -754,9 +729,8 @@ router.post('/send-otp', async (req, res) => {
       console.log(`Demo Mode - OTP for ${identifier}: ${otp}`);
       res.status(200).json({
         success: true,
-        message: 'OTP generated (Demo Mode - check console)',
-        demo: true,
-        otp: process.env.NODE_ENV === 'development' ? otp : undefined
+        message: 'OTP generated (check server console)',
+        demo: true
       });
     }
   } catch (error) {
@@ -847,6 +821,7 @@ router.post('/verify-otp', async (req, res) => {
     const tokenExpiry = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
 
     await OTP.deleteOne({ _id: otpRecord._id });
+    setAuthCookie(res, token);
 
     res.status(200).json({
       success: true,

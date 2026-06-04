@@ -23,8 +23,8 @@ import { protect, authorize } from "../middleware/auth.js";
 const upload = multer({ dest: "uploads/" });
 
 // Static paths must be registered before /:id
-router.post("/admin/bulk-upload", upload.single("csvFile"), bulkUploadProducts);
-router.post("/", upload.array("images"), createProduct);
+router.post("/admin/bulk-upload", protect, authorize("admin", "super admin"), upload.single("csvFile"), bulkUploadProducts);
+router.post("/", protect, authorize("admin", "super admin"), upload.array("images"), createProduct);
 router.post(
   "/admin/sync-discount-inherit",
   protect,
@@ -35,9 +35,9 @@ router.get("/", getProductsSimple);
 router.get("/:id/reviews", getProductReviews);
 router.post("/:id/reviews", protect, createProductReview);
 router.post("/:id/reviews/:reviewId/helpful", protect, markReviewHelpful);
-router.put("/:id/toggle-status", toggleProductStatus);
+router.put("/:id/toggle-status", protect, authorize("admin", "super admin"), toggleProductStatus);
 router.get("/:id", getSingleProduct);
-router.put("/:id", updateProduct);
-router.delete("/:id", deleteProduct);
+router.put("/:id", protect, authorize("admin", "super admin"), updateProduct);
+router.delete("/:id", protect, authorize("admin", "super admin"), deleteProduct);
 
 export default router;

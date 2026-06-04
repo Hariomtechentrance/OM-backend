@@ -70,36 +70,27 @@ router.get("/test-users", async (req, res) => {
   }
 });
 
-router.post("/make-admin", async (req, res) => {
+// Protected: only super admin can elevate users to admin
+router.post("/make-admin", protect, authorize('super admin'), async (req, res) => {
   try {
     const { email } = req.body;
+    if (!email) return res.status(400).json({ success: false, message: 'Email is required' });
+
     const user = await User.findOne({ email });
-    
     if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: 'User not found'
-      });
+      return res.status(404).json({ success: false, message: 'User not found' });
     }
-    
+
     user.role = 'admin';
     await user.save();
-    
+
     res.json({
       success: true,
       message: 'User role updated to admin',
-      user: {
-        id: user._id,
-        name: user.name,
-        email: user.email,
-        role: user.role
-      }
+      user: { id: user._id, name: user.name, email: user.email, role: user.role }
     });
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: error.message
-    });
+    res.status(500).json({ success: false, message: 'Server error' });
   }
 });
 

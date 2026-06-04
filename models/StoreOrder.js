@@ -60,7 +60,9 @@ const storeOrderSchema = new mongoose.Schema(
       courierName: { type: String },
       trackingUrl: { type: String },
       raw: { type: mongoose.Schema.Types.Mixed }
-    }
+    },
+    shippedAt: { type: Date },
+    deliveredAt: { type: Date }
   },
   { timestamps: true }
 );

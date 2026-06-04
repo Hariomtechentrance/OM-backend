@@ -248,10 +248,16 @@ exports.updateOrder = async (req, res) => {
       return res.status(404).json({ message: 'Order not found' });
     }
 
-    Object.assign(order, req.body);
+    // Whitelist only safe fields — never allow payment/status fields via this route
+    const allowed = ['shippingAddress', 'notes'];
+    const update = {};
+    for (const key of allowed) {
+      if (req.body[key] !== undefined) update[key] = req.body[key];
+    }
+    Object.assign(order, update);
     const updatedOrder = await order.save();
     res.json(updatedOrder);
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ message: 'Server error' });
   }
 };

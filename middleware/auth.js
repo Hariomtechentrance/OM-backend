@@ -1,22 +1,22 @@
 import jwt from 'jsonwebtoken';
-import User from '../models/userModel.js'; // ✅ FIXED IMPORT
+import User from '../models/userModel.js';
+import { isTokenBlacklisted } from '../utils/tokenBlacklist.js';
+import { AUTH_COOKIE } from '../utils/cookieAuth.js';
 
 const JWT_SECRET = process.env.JWT_SECRET;
 const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET;
 
 if (!JWT_SECRET || !JWT_REFRESH_SECRET) {
-  // Fail fast in production: without these secrets, auth is insecure/unreliable.
   console.error('[auth] Missing JWT_SECRET and/or JWT_REFRESH_SECRET in environment variables.');
 }
 
-// Protect routes
+// Protect routes — reads from httpOnly cookie first, falls back to Bearer header
 export const protect = async (req, res, next) => {
-  let token;
+  // 1. httpOnly cookie (not readable by JS/DevTools — most secure)
+  let token = req.cookies?.[AUTH_COOKIE];
 
-  if (
-    req.headers.authorization &&
-    req.headers.authorization.startsWith('Bearer')
-  ) {
+  // 2. Authorization header fallback (for mobile apps / direct API calls)
+  if (!token && req.headers.authorization?.startsWith('Bearer ')) {
     token = req.headers.authorization.split(' ')[1];
   }
 
@@ -35,10 +35,12 @@ export const protect = async (req, res, next) => {
       });
     }
 
-    const decoded = jwt.verify(
-      token,
-      JWT_SECRET
-    );
+    // Reject blacklisted (logged-out) tokens
+    if (isTokenBlacklisted(token)) {
+      return res.status(401).json({ success: false, message: 'Token has been revoked. Please log in again.' });
+    }
+
+    const decoded = jwt.verify(token, JWT_SECRET);
 
     // Handle admin authentication (admin users don't exist in User collection)
     if (decoded.userId === 'admin' && decoded.role === 'admin') {
