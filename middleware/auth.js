@@ -42,18 +42,6 @@ export const protect = async (req, res, next) => {
 
     const decoded = jwt.verify(token, JWT_SECRET);
 
-    // Handle admin authentication (admin users don't exist in User collection)
-    if (decoded.userId === 'admin' && decoded.role === 'admin') {
-      req.user = {
-        _id: 'admin',
-        userId: 'admin',
-        email: 'admin@blacklocust.com',
-        role: 'admin',
-        name: 'Admin User'
-      };
-      return next();
-    }
-
     const user = await User.findById(decoded.userId).select('-password');
 
     if (!user) {

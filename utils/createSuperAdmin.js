@@ -12,15 +12,23 @@ const createSuperAdmin = async () => {
       return;
     }
 
+    const email = process.env.SUPER_ADMIN_EMAIL || 'superadmin@blacklocust.com';
+    const password = process.env.SUPER_ADMIN_PASSWORD;
+
+    if (!password) {
+      console.warn('[createSuperAdmin] SUPER_ADMIN_PASSWORD env var not set — skipping super admin seed');
+      return;
+    }
+
     await User.create({
       name: 'Super Admin',
-      email: 'superadmin@blacklocust.com',
-      password: 'Admin@123',
+      email,
+      password,
       role: 'super admin',
       isActive: true
     });
 
-    console.log('🚀 Super Admin created: superadmin@blacklocust.com / Admin@123');
+    console.log('🚀 Super Admin created:', email);
   } catch (error) {
     console.error('❌ Super admin creation error:', error);
   }

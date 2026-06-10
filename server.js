@@ -108,7 +108,16 @@ app.use('/api/auth/login', authLimiter);
 app.use('/api/auth/register', authLimiter);
 app.use('/api/auth/send-otp', authLimiter);
 app.use('/api/auth/forgot-password', authLimiter);
-app.use('/api/auth/admin/login', authLimiter);
+
+// Admin login gets a tighter limit — 10 attempts per 15 min
+const adminLoginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { success: false, message: 'Too many admin login attempts, please try again in 15 minutes.' }
+});
+app.use('/api/auth/admin/login', adminLoginLimiter);
 
 // ✅ All routes registered BEFORE start() is called
 app.use('/api/settings', siteSettingsRoutes);
@@ -162,59 +171,8 @@ app.get('/api/health', (req, res) => {
 app.get('/', (req, res) => {
   res.json({
     name: 'Black Locust API',
-    version: '2.0.0',
     status: 'Running',
-    features: {
-      authentication: 'JWT + 2FA + device tracking',
-      authorization: 'Role-based access control',
-      payment: 'Stripe + Razorpay + webhook security',
-      orderProcessing: 'Atomic transactions + inventory management',
-      analytics: 'Real-time + comprehensive reporting',
-      notifications: 'Email + SMS + push notifications',
-      search: 'Advanced filtering + aggregation',
-      security: 'Input sanitization + rate limiting + audit trails'
-    },
-    endpoints: {
-      health: '/api/health',
-      authentication: {
-        register: '/api/auth/register',
-        login: '/api/auth/login',
-        profile: '/api/auth/profile',
-        'change-password': '/api/auth/change-password',
-        'enable-2fa': '/api/auth/enable-2fa',
-        activity: '/api/auth/activity',
-        'logout-all': '/api/auth/logout-all'
-      },
-      userManagement: {
-        profile: '/api/users/manage/profile',
-        analytics: '/api/users/manage/analytics'
-      },
-      productManagement: {
-        search: '/api/products/manage/search',
-        categories: '/api/products/manage/categories',
-        details: '/api/products/manage/:id',
-        reviews: '/api/products/manage/:id/reviews',
-        wishlist: '/api/products/manage/:id/wishlist',
-        analytics: '/api/products/manage/analytics'
-      },
-      orders: {
-        create: 'POST /api/orders',
-        list: 'GET /api/orders/my-orders',
-        details: 'GET /api/orders/:orderId',
-        cancel: 'PUT /api/orders/:orderId/cancel',
-        track: '/api/orders/:orderId/track',
-        'status-update': '/api/orders/:orderId/status',
-        analytics: '/api/orders/analytics/summary'
-      },
-      payments: {
-        'razorpay-key': 'GET /api/payments/razorpay/key',
-        'razorpay-order': 'POST /api/payments/razorpay/order',
-        'razorpay-verify': 'POST /api/payments/razorpay/verify'
-      },
-      products: '/api/products',
-      users: '/api/users',
-      cart: '/api/cart',
-    },
+    health: '/api/health',
     timestamp: new Date().toISOString()
   });
 });

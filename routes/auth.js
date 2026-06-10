@@ -275,30 +275,38 @@ router.post('/login', async (req, res) => {
 // Admin login
 router.post('/admin/login', async (req, res) => {
   try {
-    console.log("🔥 ADMIN LOGIN API HIT");
     const { email, password } = req.body;
 
-    if (!email || !password) {
-      return res.status(400).json({ 
-        error: 'Email and password are required' 
-      });
-    }
-
-    // Fixed admin credentials
-    if (email !== "admin@blacklocust.com" || password !== "admin123") {
-      return res.status(401).json({
-        success: false,
-        error: "Invalid admin credentials"
-      });
+    if (!email || !password || typeof email !== 'string' || typeof password !== 'string') {
+      return res.status(400).json({ error: 'Email and password are required' });
     }
 
     const secret = process.env.JWT_SECRET;
     if (!secret) return res.status(503).json({ success: false, error: 'Server not configured' });
 
+    // Look up admin/super-admin from DB — no hardcoded credentials
+    const admin = await User.findOne({
+      email: email.toLowerCase().trim(),
+      role: { $in: ['admin', 'super admin'] }
+    }).select('+password');
+
+    if (!admin) {
+      return res.status(401).json({ success: false, error: 'Invalid admin credentials' });
+    }
+
+    const passwordMatch = await bcrypt.compare(password, admin.password);
+    if (!passwordMatch) {
+      return res.status(401).json({ success: false, error: 'Invalid admin credentials' });
+    }
+
+    if (!admin.isActive) {
+      return res.status(403).json({ success: false, error: 'Admin account is disabled' });
+    }
+
     const token = jwt.sign(
-      { userId: 'admin', role: 'admin' },
+      { userId: admin._id, role: admin.role },
       secret,
-      { expiresIn: '7d' }
+      { expiresIn: '1d' }
     );
 
     setAuthCookie(res, token);
@@ -306,8 +314,7 @@ router.post('/admin/login', async (req, res) => {
     res.json({
       success: true,
       message: 'Admin login successful',
-      admin: { email, role: 'admin', name: 'Admin User' },
-      token
+      admin: { email: admin.email, role: admin.role, name: admin.name },
     });
 
   } catch (error) {

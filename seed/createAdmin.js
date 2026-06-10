@@ -7,7 +7,14 @@ import User from '../models/userModel.js';
  */
 const createAdmin = async () => {
   try {
-    const email = 'admin@blacklocust.com';
+    const email = process.env.ADMIN_EMAIL || 'admin@blacklocust.com';
+    const password = process.env.ADMIN_PASSWORD;
+
+    if (!password) {
+      console.warn('[createAdmin] ADMIN_PASSWORD env var not set — skipping admin seed');
+      return;
+    }
+
     const existing = await User.findOne({ email });
 
     if (existing) {
@@ -18,12 +25,12 @@ const createAdmin = async () => {
     await User.create({
       name: 'Admin User',
       email,
-      password: 'admin123',
+      password,
       role: 'admin',
       isActive: true
     });
 
-    console.log('🚀 Admin created:', email, '/ admin123');
+    console.log('🚀 Admin created:', email);
     return true;
   } catch (error) {
     console.error('❌ Admin creation error:', error);
