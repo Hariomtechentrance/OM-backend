@@ -309,12 +309,21 @@ router.post('/admin/login', async (req, res) => {
       { expiresIn: '1d' }
     );
 
+    const refreshToken = generateSecureToken();
+
     setAuthCookie(res, token);
 
     res.json({
       success: true,
       message: 'Admin login successful',
-      admin: { email: admin.email, role: admin.role, name: admin.name },
+      token, // ✅ CRITICAL FIX: Return token in response for frontend localStorage
+      refreshToken,
+      admin: { 
+        id: admin._id,
+        email: admin.email, 
+        role: admin.role, 
+        name: admin.name 
+      },
     });
 
   } catch (error) {

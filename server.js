@@ -219,7 +219,7 @@ const startServer = () => {
     // ✅ Keep Render free tier awake - ping every 14 minutes
     if (process.env.NODE_ENV === 'production') {
       const serverUrl = process.env.RENDER_EXTERNAL_URL ||
-        'https://om-backend-q11a.onrender.com';
+        'https://om-backend-gi1a.onrender.com'; // ✅ FIXED: Updated to match frontend .env.production
 
       setInterval(async () => {
         try {
